@@ -73,6 +73,23 @@ def validate(root=ROOT):
         if not np.isfinite(scores[present]).all() or not scores[present].between(-1.0001,1.0001).all():
             raise ValueError("Invalid handoff score.")
         passed("handoff_integrity",f"{hm['pairs']} pairs, five-method preview; IDs and finite available scores verified")
+    full_manifest=root/"results/predictions/manifest.json"
+    if full_manifest.exists():
+        from .evaluation import validate_evaluation
+        from .training import validate_lock
+        validate_evaluation(root);validate_lock(root)
+        fm=read_json(full_manifest)
+        full_path=full_manifest.parent/"pair_scores.csv.gz"
+        expected=sum(len(group)*(len(group)-1)//2 for _,group in df.groupby("asin"))
+        if (fm["dataset_version"]!=manifest["dataset_version"] or fm["pairs"]!=expected
+            or fm["method_rows"]!=expected*5 or fm["methods"]!=["A","B","C","D","E"]
+            or fm["output_sha256"]!=sha_file(full_path)
+            or fm["model_lock_sha256"]!=sha_file(root/"models/model_lock.json")
+            or fm["final_evaluation_sha256"]!=sha_file(root/"results/tables/final_evaluation.json")):
+            raise ValueError("Full inference provenance/count/checksum mismatch.")
+        if fm["decision_counts"]!={"review":expected*5} or fm.get("population_automatic_ready") is not False:
+            raise ValueError("Unvalidated population automatic decisions present.")
+        passed("full_inference_integrity",f"{expected} within-ASIN pairs, five finite method scores; output SHA and lock/evaluation provenance verified")
     out={"dataset_version":manifest["dataset_version"],"checks":checks,"study":status(root),
          "label_source":"AI_assisted_review","human_gold_standard":False}
     write_json(root/"results/tables/acceptance_report.json",out)

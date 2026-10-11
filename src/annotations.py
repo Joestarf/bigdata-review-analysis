@@ -135,9 +135,13 @@ def status(root=ROOT):
         planned=read_json(scale)
         progress={}
         for split in ["train","validation"]:
-            sheet=pd.read_csv(scale.parent/f"labels_{split}.csv",keep_default_na=False,dtype=str)
-            progress[split]={"additional_completed":int((sheet.label.ne("")&sheet.reason.str.strip().ne("")).sum()),
-                             "additional_total":len(sheet)}
+            sheets=[scale.parent/f"labels_{split}.csv"]
+            if split=="train":sheets+=sorted(scale.parent.glob("labels_train_*.csv"))
+            frames=[pd.read_csv(sheet,keep_default_na=False,dtype=str) for sheet in sheets]
+            combined=pd.concat(frames,ignore_index=True)
+            completed=combined.loc[combined.label.ne("")&combined.reason.str.strip().ne(""),"pair_id"].nunique()
+            progress[split]={"additional_completed":int(completed),
+                             "additional_total":len(frames[0])}
         # Independent test manager owns supplemental completion receipt.
         progress["test"]={"status":"independent_blind_review; values_not_read"}
         out["scale6000"]={"target":planned["target"],"activated":bool(planned.get("activated_pair_sha256")),"progress":progress}

@@ -288,4 +288,60 @@ class StudyInvariantTests(unittest.TestCase):
                 protected=protected_paths(root)
             for name in names:self.assertIn(name,protected)
 
+
+    def scale_sync_fixture(self,root):
+        annotation=root/"data/annotation";scale=annotation/"scale6000"
+        write_json(scale/"manifest.json",{"activated_pair_sha256":"fixed","dataset_version":"v"})
+        columns=["pair_id","label","reason","annotation_version"]
+        write_csv(annotation/"labels_train.csv",pd.DataFrame([["p1","","",""],["p2","","",""]],columns=columns))
+        write_csv(annotation/"labels_validation.csv",pd.DataFrame([["v1","","",""]],columns=columns))
+        write_csv(scale/"labels_train.csv",pd.DataFrame([["p1","distinct","different facts","v"],["p2","","",""]],columns=columns))
+        write_csv(scale/"labels_train_secondary.csv",pd.DataFrame([["p2","uncertain","generic text","v"]],columns=columns))
+        write_csv(scale/"labels_validation.csv",pd.DataFrame([["v1","near","same details","v"]],columns=columns))
+        return annotation,scale
+
+    def test_scale_sync_merges_independent_shards_without_test_access(self):
+        from src.scale import sync_scale_labels
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);annotation,scale=self.scale_sync_fixture(root)
+            real_reader=pd.read_csv
+            with patch("src.scale.pd.read_csv",wraps=real_reader) as reader:
+                sync_scale_labels(root)
+                self.assertFalse(any("test" in str(call.args[0]) for call in reader.call_args_list))
+            result=real_reader(annotation/"labels_train.csv",keep_default_na=False)
+            self.assertEqual(result.label.tolist(),["distinct","uncertain"])
+
+    def test_scale_sync_conflict_rejected_before_writing(self):
+        from src.scale import sync_scale_labels
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);annotation,scale=self.scale_sync_fixture(root)
+            before=sha_file(annotation/"labels_train.csv")
+            write_csv(scale/"labels_train_primary.csv",pd.DataFrame(
+                [["p1","near","same details","v"]],columns=["pair_id","label","reason","annotation_version"]))
+            with self.assertRaisesRegex(GateError,"Conflicting"):
+                sync_scale_labels(root)
+            self.assertEqual(before,sha_file(annotation/"labels_train.csv"))
+
+    def test_scale_sync_rejects_stale_review_version(self):
+        from src.scale import sync_scale_labels
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);annotation,scale=self.scale_sync_fixture(root)
+            frame=pd.read_csv(scale/"labels_train_secondary.csv",keep_default_na=False)
+            frame["annotation_version"]="stale"
+            write_csv(scale/"labels_train_secondary.csv",frame)
+            with self.assertRaisesRegex(GateError,"version invalid"):
+                sync_scale_labels(root)
+
+
+    def test_prepared_features_identical_to_original_definition(self):
+        from src.features import word_set,prepare_structure,prepared_structural_features
+        texts=["battery does not last 10 hours; A1234.","Battery lasts ten hours.","", "很好", "not GREAT!!!"]
+        for a in texts:
+            for b in texts:
+                wa,wb=word_set(a),word_set(b);la,lb=len(a),len(b)
+                expected=[len(wa&wb)/len(wa|wb) if wa|wb else 0.,
+                          min(la,lb)/max(la,lb) if max(la,lb) else 1.,
+                          abs(la-lb),float(a.casefold()==b.casefold())]
+                self.assertEqual(prepared_structural_features(prepare_structure(a),prepare_structure(b)),expected)
+
 if __name__=="__main__":unittest.main()

@@ -65,7 +65,7 @@ def prepare_synthetic(root: Path=ROOT):
         meta=read_json(mp)
         if meta["dataset_version"] != manifest["dataset_version"] or sha_file(out/"synthetic_pairs.csv") != meta["sha256"]:
             raise GateError("Synthetic artifact is stale.")
-        print("Using existing synthetic examples and human check tasks.")
+        print("Using existing synthetic examples and transformation review tasks.")
         return
     syn=generate_synthetic(df)
     write_csv(out / "synthetic_pairs.csv",syn)
@@ -76,8 +76,8 @@ def prepare_synthetic(root: Path=ROOT):
     write_csv(out / "synthetic_review.csv",checks)
     write_json(mp,{"dataset_version":manifest["dataset_version"],"seed":SEED,"rows":len(syn),
                    "sha256":sha_file(out/"synthetic_pairs.csv"),"check_rows":len(checks),
-                   "label_source":"synthetic; human approval required for transformation validity"})
-    print(f"Generated {len(syn)} synthetic positives; {len(checks)} transformation checks awaiting human review.")
+                   "label_source":"synthetic; AI-assisted transformation review authorized; no human gold standard"})
+    print(f"Generated {len(syn)} synthetic positives; {len(checks)} transformation checks awaiting explicit transformation review.")
 
 def approved_synthetic(root=ROOT):
     path=root / "data/annotation/synthetic_pairs.csv"
@@ -99,6 +99,6 @@ def approved_synthetic(root=ROOT):
     if not checks[fields].reset_index(drop=True).equals(expected_rows[fields].reset_index(drop=True)):
         raise GateError("Synthetic review bodies changed.")
     if checks.label.ne("approve").any() or checks.reason.str.strip().eq("").any():
-        raise GateError("All transformation checks must be manually approved. Rejected changes must be fixed and regenerated.")
+        raise GateError("All transformation checks must be explicitly reviewed and approved. Rejected changes must be fixed and regenerated.")
     if checks.annotation_version.ne(meta["dataset_version"]).any():raise GateError("Synthetic approval version mismatch.")
     return syn

@@ -143,14 +143,34 @@ def sync_scale_labels(root:Path=ROOT):
     out=root/"data/annotation";scale=out/"scale6000";sm=read_json(scale/"manifest.json")
     if not sm.get("activated_pair_sha256"):raise GateError("Activate candidate metadata first.")
     if (root/"models/model_lock.json").exists():raise GateError("Cannot change locked labels.")
+    pending={}
     for split in ["train","validation"]:
         old=pd.read_csv(out/f"labels_{split}.csv",keep_default_na=False,dtype=str).set_index("pair_id")
-        new=pd.read_csv(scale/f"labels_{split}.csv",keep_default_na=False,dtype=str).set_index("pair_id")
-        if not new.index.is_unique or not new.index.isin(old.index).all():raise GateError("Supplemental label IDs invalid.")
-        # Never overwrite a filled judgment with an unfinished supplemental sheet.
-        filled=new.label.ne("") & new.reason.str.strip().ne("")
-        old.loc[new.index[filled],new.columns]=new.loc[filled]
-        write_csv(out/f"labels_{split}.csv",old.reset_index())
+        paths=[scale/f"labels_{split}.csv"]
+        if split=="train":
+            paths+=sorted(scale.glob("labels_train_*.csv"))
+        seen={}
+        for path in paths:
+            new=pd.read_csv(path,keep_default_na=False,dtype=str).set_index("pair_id")
+            if set(new.columns)!={"label","reason","annotation_version"}:
+                raise GateError(f"Supplemental label schema invalid: {path.name}")
+            if not new.index.is_unique or not new.index.isin(old.index).all():
+                raise GateError(f"Supplemental label IDs invalid: {path.name}")
+            filled=new.label.ne("")
+            if (new.loc[filled,"reason"].str.strip().eq("").any()
+                or new.loc[filled,"annotation_version"].ne(sm["dataset_version"]).any()
+                or not new.loc[filled,"label"].isin(["exact","near","distinct","uncertain"]).all()):
+                raise GateError(f"Supplemental label/reason/version invalid: {path.name}")
+            for pid,row in new.loc[filled].iterrows():
+                values=tuple(row[col] for col in ["label","reason","annotation_version"])
+                if pid in seen and seen[pid]!=values:
+                    raise GateError(f"Conflicting completed train shards for pair {pid}")
+                seen[pid]=values
+            old.loc[new.index[filled],new.columns]=new.loc[filled]
+        pending[split]=old.reset_index()
+    # Validate both splits before any write. Test values are never parsed here.
+    for split,frame in pending.items():
+        write_csv(out/f"labels_{split}.csv",frame)
     print("Train/validation supplemental labels synchronized; test labels not parsed.")
 
 if __name__=="__main__":prepare_scale()

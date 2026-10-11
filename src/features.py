@@ -12,13 +12,18 @@ SEMANTIC_FEATURES = LEXICAL_FEATURES + ["semantic_cosine"]
 def word_set(text):
     return set(re.findall(r"[a-z0-9]+(?:['’-][a-z0-9]+)*", normalize_text(text)))
 
-def structural_features(a, b):
-    wa, wb = word_set(a), word_set(b)
-    denom = len(wa | wb)
-    la, lb = len(a), len(b)
+def prepare_structure(text):
+    return word_set(text),len(text),normalize_text(text)
+
+def prepared_structural_features(a,b):
+    wa,la,na=a;wb,lb,nb=b
+    denom=len(wa | wb)
     return [len(wa & wb)/denom if denom else 0.0,
-            min(la, lb)/max(la, lb) if max(la, lb) else 1.0,
-            abs(la-lb), float(normalize_text(a) == normalize_text(b))]
+            min(la,lb)/max(la,lb) if max(la,lb) else 1.0,
+            abs(la-lb),float(na==nb)]
+
+def structural_features(a,b):
+    return prepared_structural_features(prepare_structure(a),prepare_structure(b))
 
 def fit_lexical(root: Path=ROOT):
     df, manifest = load_study(root)

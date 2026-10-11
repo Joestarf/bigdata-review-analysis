@@ -17,11 +17,11 @@ cd /home/joestar/code/bigdata-review-analysis
 .venv/bin/python -m src.study scale
 # 完成原1200阶段，再激活6000定义，独立测试管理者合并并封存1000对。
 .venv/bin/python -m src.study activate-scale
-# 逐批完成scale6000/batches中的盲审并保存独立标签。
+# 逐批完成scale6000/batches中的盲审并保存独立标签；训练分工可用labels_train_*.csv，重叠已完成判断冲突会拒绝。
 .venv/bin/python -m src.study sync-scale
 .venv/bin/python -m src.study status
 .venv/bin/python -m src.study synthesize
-# 审阅synthetic_review.csv的100个变换例；全部通过后继续。
+# 逐对审阅synthetic_review.csv的100个变换例；本次AI辅助审阅须记录来源，全部通过后继续。
 .venv/bin/python -m src.study train
 .venv/bin/python -m src.study evaluate
 .venv/bin/python -m src.study benchmark
@@ -62,4 +62,6 @@ product_scores = p.score_product(g[["asin", "review_id", "text"]])
 
 ## Git归档
 
-按阶段提交和推送代码、说明、图与可审阅小型结果。保留用户原忽略设置；原始大样本、133MiB向量缓存及全量对输出留在WSL，不上传GitHub大文件。标签、CSV/JSON结果和带输出的notebook留本地，不通过强制加入绕过忽略规则。提交前运行scripts/check_git_scope.py。最终报告列实际提交ID、未完成门槛及留在本地的文件。
+按阶段提交和推送代码、说明与安全图。保留用户原忽略设置；原始大样本、133MiB向量缓存及全量对输出留在WSL，不上传GitHub大文件。标签、CSV/JSON结果和带输出的notebook留本地，不通过强制加入绕过忽略规则。提交前运行scripts/check_git_scope.py。最终报告列实际提交ID、未完成门槛及留在本地的文件。
+
+全量结果gzip使用固定mtime=0；manifest记录4,146,325评论对、五方法行数、输出SHA、模型锁SHA、最终评价SHA和实测耗时/内存。validate对总量、校验值和待复核决策范围核对。

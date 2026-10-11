@@ -2,11 +2,12 @@
 from pathlib import Path
 import gzip
 import csv
+import io
 import numpy as np
 import pandas as pd
 import joblib
 from .common import ROOT, load_study, pair_id, normalize_text, word_count, write_csv, write_json, read_json, sha_text, sha_file
-from .features import fit_lexical, structural_features, text_pair_features
+from .features import fit_lexical, structural_features, text_pair_features, prepare_structure, prepared_structural_features
 from .embedding import load_embedding_cache, load_encoder, encode_texts
 from .training import METHODS, validate_lock
 from .annotations import GateError
@@ -22,11 +23,12 @@ class Predictor:
         self.models={m:joblib.load(root/f"models/{m}.joblib") for m in ["C","E"]} if self.lock else {}
         self.encoder=None
 
-    def _decision(self,m,score,a,b):
-        if word_count(a)<5 or word_count(b)<5:
-            return "review","short_text; exact_signal="+str(normalize_text(a)==normalize_text(b)).lower()
+    def _decision(self,m,score,a,b,short=None,exact=None):
+        short = word_count(a)<5 or word_count(b)<5 if short is None else short
+        if short:
+            return "review","short_text; exact_signal="+str(normalize_text(a)==normalize_text(b) if exact is None else exact).lower()
         if not self.lock:
-            return "review","annotation_gate_not_met_or_model_not_locked; exact_signal="+str(normalize_text(a)==normalize_text(b)).lower()
+            return "review","annotation_gate_not_met_or_model_not_locked; exact_signal="+str(normalize_text(a)==normalize_text(b) if exact is None else exact).lower()
         config=self.lock["methods"][m]
         if self.lock.get("population_automatic_ready") is not True:
             return "review","enriched_AI_benchmark_only; independent_population_review_required"
@@ -43,14 +45,17 @@ class Predictor:
             scores["E"]=self.models["E"].predict_proba(x)[:,1]
         truncated = [False]*len(a) if truncated is None else truncated
         rows=[]
+        short_lookup={t:word_count(t)<5 for t in set(a)|set(b)}
         for i,(ta,tb) in enumerate(zip(a,b)):
             ia,ib=ids[i]
+            pid=pair_id(ia,ib)
+            short=short_lookup[ta] or short_lookup[tb]
             for m in METHODS:
                 score=float(scores[m][i]) if m in scores else None
                 if score is not None and not np.isfinite(score):raise ValueError("Nonfinite model score.")
-                decision,reason=self._decision(m,score,ta,tb)
+                decision,reason=self._decision(m,score,ta,tb,short=short,exact=bool(x[i,4]))
                 if truncated[i]:reason += "; encoder_input_truncated"
-                rows.append({"pair_id":pair_id(ia,ib),"asin":asin,"review_id_a":ia,"review_id_b":ib,
+                rows.append({"pair_id":pid,"asin":asin,"review_id_a":ia,"review_id_b":ib,
                              "method":m,"score":score,"decision":decision,"reason":reason})
         return pd.DataFrame(rows,columns=["pair_id","asin","review_id_a","review_id_b","method","score","decision","reason"])
 
@@ -101,7 +106,8 @@ class Predictor:
         sem=vec@vec.T
         i,j=np.triu_indices(len(reviews),1)
         texts=reviews.text.tolist()
-        x=np.array([[float(lex[ia,ib])]+structural_features(texts[ia],texts[ib])+[float(sem[ia,ib])]
+        prepared=[prepare_structure(text) for text in texts]
+        x=np.array([[float(lex[ia,ib])]+prepared_structural_features(prepared[ia],prepared[ib])+[float(sem[ia,ib])]
                     for ia,ib in zip(i,j)],dtype=np.float32)
         return self._format([texts[v] for v in i],[texts[v] for v in j],[(ids[ia],ids[ib]) for ia,ib in zip(i,j)],str(reviews.asin.iloc[0]),x,truncated[i]|truncated[j])
 
@@ -124,7 +130,9 @@ def handoff(root=ROOT,count=10):
                "status":"locked_model" if predictor.lock else "preview_only_no_locked_model",
                "automatic_decisions":bool(predictor.lock and predictor.lock.get("population_automatic_ready",False)),"transitive_groups_created":False,
                "file_sha256":{p:sha_file(out/p) for p in ["reviews.csv","pair_scores.csv"]},
-               "note":"Untrained C/E scores are blank; all preview decisions require human review."})
+               "model_lock_sha256":sha_file(root/"models/model_lock.json") if predictor.lock else None,
+               "score_meanings":predictor.lock["score_meanings"] if predictor.lock else {"C":"untrained","E":"untrained"},
+               "note":"AI benchmark scores; review decisions require independent review before downstream weighting."})
     return {"products":len(products),"reviews":len(reviews),"pairs":len(results)//5,"path":str(out)}
 
 def infer_all(root=ROOT):
@@ -137,17 +145,33 @@ def infer_all(root=ROOT):
     path=root/"results/predictions/pair_scores.csv.gz"
     path.parent.mkdir(parents=True,exist_ok=True)
     temporary=path.with_suffix(".partial")
-    count=0
-    with gzip.open(temporary,"wt",encoding="utf-8",newline="") as handle:
-        writer=None
-        for _,g in predictor.df.groupby("asin",sort=True):
-            result=predictor.score_product(g)
-            if writer is None:
-                writer=csv.writer(handle)
-                writer.writerow(result.columns)
-            writer.writerows(result.fillna("").itertuples(index=False,name=None))
-            count+=len(result)//5
+    count=0;method_rows=0;decision_counts={}
+    from .performance import Monitor
+    with Monitor() as monitor:
+        with temporary.open("wb") as raw:
+            with gzip.GzipFile(fileobj=raw,mode="wb",mtime=0,filename="") as compressed:
+                with io.TextIOWrapper(compressed,encoding="utf-8",newline="") as handle:
+                    writer=None
+                    for k,(_,g) in enumerate(predictor.df.groupby("asin",sort=True),1):
+                        result=predictor.score_product(g)
+                        expected=len(g)*(len(g)-1)//2
+                        if len(result)!=expected*len(METHODS):
+                            raise ValueError("Product inference pair/method count mismatch.")
+                        if writer is None:
+                            writer=csv.writer(handle);writer.writerow(result.columns)
+                        writer.writerows(result.fillna("").itertuples(index=False,name=None))
+                        count+=expected;method_rows+=len(result)
+                        for key,value in result.decision.value_counts().items():
+                            decision_counts[key]=decision_counts.get(key,0)+int(value)
+                        if k%100==0:print(f"Inference products={k}, pairs={count}",flush=True)
+    expected_total=sum(len(g)*(len(g)-1)//2 for _,g in predictor.df.groupby("asin"))
+    if count!=expected_total:raise ValueError("Full inference count mismatch.")
     temporary.replace(path)
     write_json(path.parent/"manifest.json",{"dataset_version":predictor.manifest["dataset_version"],"pairs":count,
-               "methods":METHODS,"full_within_product_pairs":True,"no_transitive_clustering":True})
-    return {"pairs":count,"output":str(path)}
+               "method_rows":method_rows,"products":int(predictor.df.asin.nunique()),
+               "methods":METHODS,"full_within_product_pairs":True,"no_transitive_clustering":True,
+               "output_sha256":sha_file(path),"model_lock_sha256":sha_file(root/"models/model_lock.json"),
+               "final_evaluation_sha256":sha_file(final),"performance":monitor.result,
+               "decision_counts":decision_counts,"score_meanings":predictor.lock["score_meanings"],
+               "population_automatic_ready":False,"compression":"gzip with deterministic mtime=0"})
+    return {"pairs":count,"method_rows":method_rows,"output":str(path)}
