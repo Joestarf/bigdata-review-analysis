@@ -33,6 +33,7 @@ hf-xet==1.7.0
 httpcore==1.0.9
 httpx==0.28.1
 huggingface_hub==1.33.0
+datasets==5.1.0
 idna==3.20
 ipykernel==7.4.0
 ipython==9.17.1

@@ -1,0 +1,62 @@
+# 运行与交接说明
+
+## 环境与状态
+
+Windows宿主，archlinux WSL，项目 /home/joestar/code/bigdata-review-analysis，现有.venv/Python3.14及RTX3060 Laptop 6GB。固定Amazon样本90750评论、1000ASIN。当前已固定6000对目标（4000/1000/1000），正在逐批AI辅助盲审；未经人类金标准复核。当前进度及模型是否存在，以study status与实际文件为准，历史初600对结果见stage1_snapshot.md。
+
+## 运行顺序
+
+~~~powershell
+wsl -d archlinux
+~~~
+
+~~~bash
+cd /home/joestar/code/bigdata-review-analysis
+.venv/bin/python -m src.study prepare
+.venv/bin/python -m src.study extend
+.venv/bin/python -m src.scale
+# 逐批完成data/annotation/scale6000/batches中的正文盲审，独立测试管理者封存。
+.venv/bin/python -m src.study status
+.venv/bin/python -m src.study synthesize
+# 审阅synthetic_review.csv的100个变换例；全部通过后继续。
+.venv/bin/python -m src.study train
+.venv/bin/python -m src.study evaluate
+.venv/bin/python -m src.study benchmark
+.venv/bin/python -m src.study infer
+.venv/bin/python -m src.study handoff
+.venv/bin/python -m src.study validate
+.venv/bin/python -m unittest discover -s tests -v
+~~~
+
+prepare复核文件SHA、稳定编号、划分和缓存；不会覆盖已有标签。原CSV保留五字段，dataset_version为文件SHA；review_id由版本和固定行号生成。原下载源revision未记录；未来下载会固定revision。重做默认preprocess会因12条新版清洗差异拒绝覆盖旧版本；请--output另存并重建版本及相关缓存。
+
+扩样仅在模型锁定前进行，固定候选一次生成，不按测试成绩补标。原600备份保留。新的6000候选先单独生成，避免覆盖正在进行的1200阶段判断；激活后由独立测试管理者合并测试标签，建模端只查看完成清单与文件SHA，不打开测试值。
+
+## 标注、门槛与封存
+
+本地页面 study serve --port 8765 只显示两段正文和理由。60对pilot固定规范。测试由独立管理任务在盲表中判断；建模界面直到最终评价封存后才开放测试只读查看，始终不允许网页修改。test_seal.json记录版本、行数、完成数与标签文件SHA，不记录分布。
+
+训练至少20确定正例/50负例，验证及测试各至少20正例/20负例。2000合成训练正例（1000完整复制、4种扰动各250）来源仅限训练记录，变换每种先逐对看20例。合成总权重为确定真实训练权重的25%，即合并权重20%。不把随机对直接当负例。
+
+资格按完整验证批次：确定TP/全部允许正预测的保守precision下界≥95%，至少30个允许正预测，优先召回、同分优先低成本。uncertain另报，保留上下界。无方法达标则所有配置仅用于探索复核；即使富集AI基准达标，全量仍review，因为没有自然场景独立精确率证据。模型锁定后才启封一次最终测试，不能据测试五方法比较再挑模型。
+
+## Python接口
+
+~~~python
+from src.inference import Predictor
+from src.common import load_study
+p = Predictor()
+result = p.predict_pairs([("Battery lasts ten hours after a full charge.",
+                           "Battery does not last ten hours after a full charge.")])
+df, _ = load_study()
+g = df[df.asin == sorted(df.asin.unique())[0]]
+product_scores = p.score_product(g[["asin", "review_id", "text"]])
+~~~
+
+每对输出5行：pair_id、asin、review_id_a、review_id_b、method、score、decision、reason。A规范化匹配0/1，B字符TFIDF余弦，C词面逻辑回归输出，D编码器余弦，E词面+语义逻辑回归输出；分类器分数未校准，不能称真实重复概率。正文接口虚拟ID不能回连原CSV；交换两段正文保持同一pair_id。商品接口要求单ASIN、唯一ID、非空正文，每个已知ID的正文和ASIN必须核对，即使同时包含新ID。
+
+少于5词默认review并保留匹配信号。未训练C/E分数为空；训练后输出完整分数。逐商品计算全部对，不创建90k全局稠密矩阵；无降权权重、无自动传递聚类。错误消息指出缺标签、版本或校验失败，不能复用过期缓存/锁。
+
+## Git归档
+
+按阶段提交和推送代码、说明、图与可审阅小型结果。保留用户原忽略设置；原始大样本、133MiB向量缓存及全量对输出留在WSL，不上传GitHub大文件。轻量标签和结果以明确选择的强制加入方式归档。最终报告列实际提交ID、未完成门槛及留在本地的文件。

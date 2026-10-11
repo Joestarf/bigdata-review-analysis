@@ -1,12 +1,16 @@
+# Python
 .venv/
-
-data/
-
-*.json
-
-*csv
-
 __pycache__/
+*.pyc
 
+# Dataset
+data/
+*.json
+*.jsonl
+*.csv
+
+# Jupyter
 .ipynb_checkpoints/
 
+# Model cache
+models/
