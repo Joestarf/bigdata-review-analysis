@@ -62,7 +62,7 @@ def protected_paths(root):
            "models/lexical.joblib","models/lexical_manifest.json",
            "models/embedding_manifest.json","models/embedding_index.csv",
            "models/C.joblib","models/E.joblib",
-           "src/common.py","src/features.py","src/embedding.py","src/inference.py","src/training.py","src/evaluation.py"]
+           "src/common.py","src/features.py","src/embedding.py","src/inference.py","src/training.py","src/evaluation.py","src/annotations.py","src/synthetic.py"]
     return {p:sha_file(root/p) for p in paths}
 
 def validate_lock(root=ROOT):
@@ -71,6 +71,7 @@ def validate_lock(root=ROOT):
     lock=read_json(path)
     _,manifest=load_study(root)
     if lock["dataset_version"]!=manifest["dataset_version"]:raise GateError("Locked model dataset mismatch.")
+    if lock["packages"] != packages():raise GateError("Locked dependency versions changed.")
     for p,digest in lock["protected_files"].items():
         if not (root/p).exists() or sha_file(root/p)!=digest:raise GateError(f"Locked artifact changed: {p}")
     return lock
@@ -137,8 +138,11 @@ def train(root:Path=ROOT):
     original_path=root/"data/annotation/original600/pair_metadata.csv"
     if original_path.exists():
         original_ids=set(pd.read_csv(original_path).pair_id)
+        intermediate=root/"data/annotation/original1200/pair_metadata.csv"
+        middle_ids=set(pd.read_csv(intermediate).pair_id) if intermediate.exists() else set(val_labels.pair_id)
         for cohort,mask in [("original150",val_labels.pair_id.isin(original_ids)),
-                            ("extension300",~val_labels.pair_id.isin(original_ids))]:
+                            ("extension300",val_labels.pair_id.isin(middle_ids)&~val_labels.pair_id.isin(original_ids)),
+                            ("scale550",~val_labels.pair_id.isin(middle_ids))]:
             for m in METHODS:
                 if mask.any():
                     rows.append({"method":m,"split":"validation","cohort":cohort,**configs[m],

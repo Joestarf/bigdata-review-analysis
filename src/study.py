@@ -9,7 +9,7 @@ def main():
     parser=argparse.ArgumentParser(description="Review redundancy study, with sealed labels and explicit acceptance gates")
     parser.add_argument("--root",type=Path,default=ROOT)
     subs=parser.add_subparsers(dest="command",required=True)
-    for name in ["audit","embed","pairs","prepare","synthesize","train","evaluate","handoff","infer","benchmark","validate","status","explore-labels","extend"]:
+    for name in ["audit","embed","pairs","prepare","synthesize","train","evaluate","handoff","infer","benchmark","validate","status","explore-labels","extend","scale","activate-scale","sync-scale"]:
         subs.add_parser(name)
     serve=subs.add_parser("serve");serve.add_argument("--port",type=int,default=8765)
     args=parser.parse_args();root=args.root.resolve()
@@ -32,6 +32,15 @@ def main():
             case "serve":
                 from .annotation_server import serve
                 serve(root,args.port)
+            case "scale":
+                from .scale import prepare_scale
+                prepare_scale(root)
+            case "activate-scale":
+                from .scale import activate_scale
+                activate_scale(root)
+            case "sync-scale":
+                from .scale import sync_scale_labels
+                sync_scale_labels(root)
             case "extend":
                 from .extension import extend_pairs
                 extend_pairs(root)

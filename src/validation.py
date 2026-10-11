@@ -28,6 +28,22 @@ def validate(root=ROOT):
         if text.text_a!=lookup.loc[r.review_id_a,"text"] or text.text_b!=lookup.loc[r.review_id_b,"text"]:
             raise ValueError("Annotation pair body alignment mismatch.")
     passed("pair_integrity",f"{len(pairs)} unique within-product/split pairs; no self or reversed pairs")
+    scale=root/"data/annotation/scale6000"
+    if (scale/"manifest.json").exists():
+        sm=read_json(scale/"manifest.json")
+        if sm["dataset_version"]!=manifest["dataset_version"]:raise ValueError("Scale dataset version mismatch.")
+        for name,key in [("additional_metadata.csv","additional_metadata_sha256"),("additional_texts.csv","additional_texts_sha256")]:
+            if sha_file(scale/name)!=sm[key]:raise ValueError("Scale candidate checksum mismatch.")
+        added=pd.read_csv(scale/"additional_metadata.csv",keep_default_na=False)
+        combined=pairs if sm.get("activated_pair_sha256") else pd.concat([pairs,added],ignore_index=True)
+        validate_pairs(combined,df)
+        if combined.split.value_counts().to_dict()!=sm["target"]:raise ValueError("Scale fixed quota mismatch.")
+        added_texts=pd.read_csv(scale/"additional_texts.csv",keep_default_na=False).set_index("pair_id")
+        for row in added.itertuples():
+            text=added_texts.loc[row.pair_id]
+            if text.text_a!=lookup.loc[row.review_id_a,"text"] or text.text_b!=lookup.loc[row.review_id_b,"text"]:
+                raise ValueError("Supplemental body back-reference mismatch.")
+        passed("scale6000_candidates",f"{len(combined)} fixed valid pairs; {len(added)} additions, body/version/SHA checks passed")
     vectors,index,emeta=load_embedding_cache(root)
     for start in range(0,len(vectors),10000):
         block=np.asarray(vectors[start:start+10000])

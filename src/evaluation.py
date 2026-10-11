@@ -69,7 +69,11 @@ def evaluate(root=ROOT):
                             **result,"uncertain":int((~definite).sum()),"review":int(review.sum()),
                             "annotation_source":"AI_assisted_review"})
         original_ids=set(pd.read_csv(root/"data/annotation/original600/pair_metadata.csv").pair_id) if (root/"data/annotation/original600/pair_metadata.csv").exists() else set(test.pair_id)
-        for cohort,cmask in [("original150",test.pair_id.isin(original_ids)),("extension300",~test.pair_id.isin(original_ids))]:
+        intermediate=root/"data/annotation/original1200/pair_metadata.csv"
+        middle_ids=set(pd.read_csv(intermediate).pair_id) if intermediate.exists() else set(test.pair_id)
+        for cohort,cmask in [("original150",test.pair_id.isin(original_ids)),
+                            ("extension300",test.pair_id.isin(middle_ids)&~test.pair_id.isin(original_ids)),
+                            ("scale550",~test.pair_id.isin(middle_ids))]:
             if cmask.any():
                 breakdowns.append({"method":m,"group":cohort,**bounded_metrics(test.loc[cmask,"target"].to_numpy(dtype=float),predicted[cmask]),
                                    "contains_both_classes":test.loc[cmask,"target"].nunique()==2})

@@ -254,4 +254,19 @@ class StudyInvariantTests(unittest.TestCase):
             out=p.predict_pairs([texts,texts[::-1]])
         self.assertEqual(out.pair_id.iloc[0],out.pair_id.iloc[5])
 
+    def test_unactivated_scale_stops_intermediate_training(self):
+        from src.annotations import require_training_labels
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            write_json(root/"data/annotation/scale6000/manifest.json",{"target":{"train":4000}})
+            with patch("src.annotations.require_frozen_guidelines"),patch("src.annotations.read_labels") as reader:
+                with self.assertRaisesRegex(GateError,"fixed6000"):require_training_labels(root)
+                reader.assert_not_called()
+
+    def test_test_label_reader_requires_model_lock_first(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with patch("src.annotations.pd.read_csv") as reader:
+                with self.assertRaises(GateError):read_labels(Path(directory),"test")
+                reader.assert_not_called()
+
 if __name__=="__main__":unittest.main()

@@ -14,8 +14,11 @@ wsl -d archlinux
 cd /home/joestar/code/bigdata-review-analysis
 .venv/bin/python -m src.study prepare
 .venv/bin/python -m src.study extend
-.venv/bin/python -m src.scale
-# 逐批完成data/annotation/scale6000/batches中的正文盲审，独立测试管理者封存。
+.venv/bin/python -m src.study scale
+# 完成原1200阶段，再激活6000定义，独立测试管理者合并并封存1000对。
+.venv/bin/python -m src.study activate-scale
+# 逐批完成scale6000/batches中的盲审并保存独立标签。
+.venv/bin/python -m src.study sync-scale
 .venv/bin/python -m src.study status
 .venv/bin/python -m src.study synthesize
 # 审阅synthetic_review.csv的100个变换例；全部通过后继续。

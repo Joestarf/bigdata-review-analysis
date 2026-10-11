@@ -62,8 +62,11 @@ class AnnotationStore:
             raise GateError("Unknown annotation stage.")
         if stage != "pilot":
             require_frozen_guidelines(self.root)
-        if stage == "test" and not (self.root / "results/tables/final_evaluation.json").exists():
-            raise GateError("测试由独立盲审任务管理；建模界面仅在最终评价封存后开放只读查看。")
+        if stage == "test":
+            if not (self.root / "results/tables/final_evaluation.json").exists():
+                raise GateError("测试由独立盲审任务管理；建模界面仅在最终评价封存后开放只读查看。")
+            from .evaluation import validate_evaluation
+            validate_evaluation(self.root)
     def stage_rows(self, stage):
         self.check_stage(stage)
         if stage == "synthetic":
@@ -122,6 +125,8 @@ class AnnotationStore:
             return {"saved": True}
     def freeze(self):
         with self.lock:
+            if (self.root / "models/model_lock.json").exists():
+                raise GateError("模型已锁定，不能重新冻结或改写标注规范。")
             pilot = self.stage_rows("pilot")
             if pilot.label.eq("").any() or pilot.reason.str.strip().eq("").any():
                 raise GateError("第一批60对尚未完成，不能固定规范。")

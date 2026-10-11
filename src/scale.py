@@ -1,6 +1,7 @@
 """Generate a fixed larger blind benchmark before any model fit or test opening."""
 from pathlib import Path
 from collections import defaultdict
+import shutil
 import numpy as np
 import pandas as pd
 from .common import ROOT,SEED,load_study,pair_id,word_count,write_csv,write_json,read_json,sha_file
@@ -15,9 +16,14 @@ def prepare_scale(root:Path=ROOT):
     if (root/"models/model_lock.json").exists():
         raise GateError("Do not enlarge a benchmark after model lock/test evaluation.")
     out=root/"data/annotation/scale6000"
-    if (out/"manifest.json").exists():
-        print("Fixed 6000 benchmark candidates already generated; no repeated mining.");return
     df,manifest=load_study(root)
+    if (out/"manifest.json").exists():
+        existing_manifest=read_json(out/"manifest.json")
+        if existing_manifest["dataset_version"]!=manifest["dataset_version"]:
+            raise GateError("Existing scale candidates belong to a different dataset.")
+        for name,key in [("additional_metadata.csv","additional_metadata_sha256"),("additional_texts.csv","additional_texts_sha256")]:
+            if sha_file(out/name)!=existing_manifest[key]:raise GateError("Existing scale candidate checksum mismatch.")
+        print("Fixed 6000 benchmark candidates verified; no repeated mining.");return
     existing=pd.read_csv(root/"data/annotation/pair_metadata.csv",keep_default_na=False)
     used=set(existing.pair_id)
     vectorizer=fit_lexical(root);embeddings,_,_=load_embedding_cache(root)
@@ -86,5 +92,65 @@ def prepare_scale(root:Path=ROOT):
         "annotation_source":"AI_assisted_review; no human gold standard",
         "note":"Generated separately while 1200-pair annotation is running. Independent test manager merges final labels; no modeling code reads test values."})
     print({"target":TARGET,"additional":added.split.value_counts().to_dict(),"path":str(out)})
+
+def activate_scale(root:Path=ROOT):
+    """Merge candidate definitions once; never parse test labels."""
+    from .annotations import require_test_seal, read_labels
+    if (root/"models/model_lock.json").exists():raise GateError("Model already locked.")
+    out=root/"data/annotation";scale=out/"scale6000";sm=read_json(scale/"manifest.json")
+    if sm.get("activated_pair_sha256"):
+        if sha_file(out/"pair_metadata.csv")!=sm["activated_pair_sha256"]:
+            raise GateError("Activated scale metadata changed.")
+        print("6000 candidate definitions already activated.");return
+    # Finish the intermediate batch, then archive its immutable materials.
+    read_labels(root,"train");read_labels(root,"validation");require_test_seal(root)
+    df,manifest=load_study(root)
+    if sm["dataset_version"]!=manifest["dataset_version"] or sha_file(out/"pair_metadata.csv")!=sm["base_pair_sha256"]:
+        raise GateError("Scale base dataset/candidates changed.")
+    for name,key in [("additional_metadata.csv","additional_metadata_sha256"),("additional_texts.csv","additional_texts_sha256")]:
+        if sha_file(scale/name)!=sm[key]:raise GateError("Scale candidate checksum mismatch.")
+    existing=pd.read_csv(out/"pair_metadata.csv",keep_default_na=False)
+    additional=pd.read_csv(scale/"additional_metadata.csv",keep_default_na=False)
+    combined=pd.concat([existing,additional],ignore_index=True);validate_pairs(combined,df)
+    if combined.split.value_counts().to_dict()!=TARGET:raise GateError("Final fixed quota mismatch.")
+    backup=out/"original1200";backup.mkdir(exist_ok=False)
+    for name in ["pair_metadata.csv","annotation_texts.csv","pair_manifest.json","guideline_freeze.json",
+                 "labels_train.csv","labels_validation.csv","labels_test.csv","test_seal.json"]:
+        shutil.copy2(out/name,backup/name)
+    texts=pd.concat([pd.read_csv(out/"annotation_texts.csv",keep_default_na=False),
+                     pd.read_csv(scale/"additional_texts.csv",keep_default_na=False)],ignore_index=True)
+    if not texts.pair_id.is_unique or set(texts.pair_id)!=set(combined.pair_id):raise GateError("Scale body ID mismatch.")
+    for split in ["train","validation"]:
+        old=pd.read_csv(out/f"labels_{split}.csv",keep_default_na=False,dtype=str)
+        new=pd.read_csv(scale/f"labels_{split}.csv",keep_default_na=False,dtype=str)
+        write_csv(out/f"labels_{split}.csv",pd.concat([old,new],ignore_index=True))
+    write_csv(out/"pair_metadata.csv",combined);write_csv(out/"annotation_texts.csv",texts)
+    meta=read_json(out/"pair_manifest.json")
+    meta.update({"candidate_version":3,"quotas":TARGET,"pair_table_sha256":sha_file(out/"pair_metadata.csv"),
+                 "text_table_sha256":sha_file(out/"annotation_texts.csv"),"scale_policy":sm["policy"]})
+    write_json(out/"pair_manifest.json",meta)
+    freeze=read_json(out/"guideline_freeze.json")
+    freeze["previous_pair_table_sha256"]=freeze["pair_table_sha256"]
+    freeze["pair_table_sha256"]=meta["pair_table_sha256"]
+    freeze["scale_authorization"]="User explicitly requested larger labels; target6000 fixed before fitting; guide unchanged."
+    write_json(out/"guideline_freeze.json",freeze)
+    sm["activated_pair_sha256"]=meta["pair_table_sha256"];write_json(scale/"manifest.json",sm)
+    # Existing test receipt no longer matches new tasks until independent manager merges.
+    print("6000 candidate metadata activated. Test manager must merge/seal1000; train/validation supplemental labels may need synchronization.")
+
+def sync_scale_labels(root:Path=ROOT):
+    """Overlay independent train/validation judgments only; test manager owns test."""
+    out=root/"data/annotation";scale=out/"scale6000";sm=read_json(scale/"manifest.json")
+    if not sm.get("activated_pair_sha256"):raise GateError("Activate candidate metadata first.")
+    if (root/"models/model_lock.json").exists():raise GateError("Cannot change locked labels.")
+    for split in ["train","validation"]:
+        old=pd.read_csv(out/f"labels_{split}.csv",keep_default_na=False,dtype=str).set_index("pair_id")
+        new=pd.read_csv(scale/f"labels_{split}.csv",keep_default_na=False,dtype=str).set_index("pair_id")
+        if not new.index.is_unique or not new.index.isin(old.index).all():raise GateError("Supplemental label IDs invalid.")
+        # Never overwrite a filled judgment with an unfinished supplemental sheet.
+        filled=new.label.ne("") & new.reason.str.strip().ne("")
+        old.loc[new.index[filled],new.columns]=new.loc[filled]
+        write_csv(out/f"labels_{split}.csv",old.reset_index())
+    print("Train/validation supplemental labels synchronized; test labels not parsed.")
 
 if __name__=="__main__":prepare_scale()

@@ -65,6 +65,9 @@ def require_frozen_guidelines(root=ROOT):
 
 def require_training_labels(root=ROOT):
     require_frozen_guidelines(root)
+    scale=root/"data/annotation/scale6000/manifest.json"
+    if scale.exists() and not read_json(scale).get("activated_pair_sha256"):
+        raise GateError("Finish and activate the fixed6000 benchmark before training; do not lock the intermediate1200 batch.")
     train = read_labels(root, "train")
     val = read_labels(root, "validation")
     for name, labels, pos, neg in [("train", train, 20, 50), ("validation", val, 20, 20)]:
@@ -90,7 +93,7 @@ def require_test_seal(root=ROOT):
     return seal
 
 def status(root=ROOT):
-    out = {"stage": "awaiting_preparation", "human_required": True}
+    out = {"stage": "awaiting_preparation", "human_required": False, "additional_label_review_required": True}
     path = root / "data/annotation/pair_manifest.json"
     if not path.exists():
         return out
@@ -105,6 +108,11 @@ def status(root=ROOT):
         counts["test"] = {"completed": seal["completed"], "total": seal["rows"], "sealed": True}
     except GateError:
         counts["test"] = {"completed": None, "total": meta["quotas"]["test"], "sealed": False}
+        previous=root/"data/annotation/original1200/test_seal.json"
+        if previous.exists():
+            receipt=read_json(previous)
+            if receipt.get("labels_sha256")==sha_file(previous.parent/"labels_test.csv"):
+                counts["test"]["previous_sealed_rows"]=receipt["completed"]
     out.update({"annotation": counts, "pilot": 60, "guidelines_frozen": (root / "data/annotation/guideline_freeze.json").exists(),
                 "models_locked": (root / "models/model_lock.json").exists(),
                 "final_evaluated": (root / "results/tables/final_evaluation.json").exists()})
@@ -122,6 +130,18 @@ def status(root=ROOT):
         out["stage"] = "awaiting_final_evaluation"
     if out["final_evaluated"]:
         out["stage"] = "final_evaluation_sealed"
+    scale=root/"data/annotation/scale6000/manifest.json"
+    if scale.exists():
+        planned=read_json(scale)
+        progress={}
+        for split in ["train","validation"]:
+            sheet=pd.read_csv(scale.parent/f"labels_{split}.csv",keep_default_na=False,dtype=str)
+            progress[split]={"additional_completed":int((sheet.label.ne("")&sheet.reason.str.strip().ne("")).sum()),
+                             "additional_total":len(sheet)}
+        # Independent test manager owns supplemental completion receipt.
+        progress["test"]={"status":"independent_blind_review; values_not_read"}
+        out["scale6000"]={"target":planned["target"],"activated":bool(planned.get("activated_pair_sha256")),"progress":progress}
+        if not planned.get("activated_pair_sha256"):out["stage"]="awaiting_fixed_scale6000_annotation"
     out["label_source"] = "AI_assisted_review"
     out["human_gold_standard"] = False
     write_json(root / "results/tables/study_status.json", out)
