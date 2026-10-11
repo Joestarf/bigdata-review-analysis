@@ -22,18 +22,26 @@ def product_bootstrap(frame,iterations=1000):
     groups=[g for _,g in frame.groupby("asin",sort=True)]
     if len(groups)<2 or frame.target.nunique()<2:
         return {"status":"insufficient_products_or_classes","products":len(groups),"valid_resamples":0}
-    rng=np.random.default_rng(SEED)
-    samples=[]
+    # Cluster-level confusion counts preserve the exact product resampling scheme.
+    counts=np.array([[int(((g.target==0)&~g.predicted).sum()),
+                      int(((g.target==0)&g.predicted).sum()),
+                      int(((g.target==1)&~g.predicted).sum()),
+                      int(((g.target==1)&g.predicted).sum())] for g in groups],dtype=np.int64)
+    rng=np.random.default_rng(SEED);samples=[]
     for _ in range(iterations):
-        selected=pd.concat([groups[i] for i in rng.integers(0,len(groups),len(groups))],ignore_index=True)
-        if selected.target.nunique()<2:continue
-        m=metrics(selected.target,selected.predicted)
-        samples.append([m["precision"],m["recall"],m["f1"]])
-    if len(samples)<100:return {"status":"insufficient_valid_resamples","valid_resamples":len(samples)}
+        tn,fp,fn,tp=counts[rng.integers(0,len(groups),len(groups))].sum(axis=0)
+        if tp+fn==0 or tn+fp==0:continue
+        samples.append([tp/(tp+fp) if tp+fp else np.nan,tp/(tp+fn),2*tp/(2*tp+fp+fn)])
+    if len(samples)<100:return {"status":"insufficient_valid_resamples","products":len(groups),"valid_resamples":len(samples)}
     arr=np.asarray(samples)
-    return {"status":"ok","products":len(groups),"valid_resamples":len(samples),"iterations":iterations,"seed":SEED,
-            **{f"{k}_{b}":float(np.percentile(arr[:,i],q)) for i,k in enumerate(["precision","recall","f1"])
-               for b,q in [("low",2.5),("high",97.5)]}}
+    result={"status":"ok","products":len(groups),"valid_resamples":len(samples),"iterations":iterations,"seed":SEED}
+    for i,k in enumerate(["precision","recall","f1"]):
+        values=arr[np.isfinite(arr[:,i]),i];valid=len(values)
+        result[f"{k}_valid_resamples"]=valid
+        result[f"{k}_status"]="ok" if valid>=100 else "undefined_or_insufficient_valid_resamples"
+        result[f"{k}_low"]=float(np.percentile(values,2.5)) if valid>=100 else None
+        result[f"{k}_high"]=float(np.percentile(values,97.5)) if valid>=100 else None
+    return result
 
 def evaluate(root=ROOT):
     if (root/"results/tables/final_evaluation.json").exists():

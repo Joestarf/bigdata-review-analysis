@@ -28,6 +28,7 @@ cd /home/joestar/code/bigdata-review-analysis
 .venv/bin/python -m src.study infer
 .venv/bin/python -m src.study handoff
 .venv/bin/python -m src.study validate
+.venv/bin/python -m src.study report
 .venv/bin/python -m unittest discover -s tests -v
 ~~~
 
@@ -65,3 +66,5 @@ product_scores = p.score_product(g[["asin", "review_id", "text"]])
 按阶段提交和推送代码、说明与安全图。保留用户原忽略设置；原始大样本、133MiB向量缓存及全量对输出留在WSL，不上传GitHub大文件。标签、CSV/JSON结果和带输出的notebook留本地，不通过强制加入绕过忽略规则。提交前运行scripts/check_git_scope.py。最终报告列实际提交ID、未完成门槛及留在本地的文件。
 
 全量结果gzip使用固定mtime=0；manifest记录4,146,325评论对、五方法行数、输出SHA、模型锁SHA、最终评价SHA和实测耗时/内存。validate对总量、校验值和待复核决策范围核对。
+
+report命令必须在最终评价、全量推断及性能基准完成后运行，生成汇总报告、三张对照图和本地逐文件SHA清单；不重新拟合或重跑测试。

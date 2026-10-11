@@ -32,7 +32,7 @@
 | `decision` | `duplicate`、`distinct` 或 `review`。`review` 表示需人工复核/证据不足。 |
 | `reason` | 简明说明输出依据或触发复核的原因；不得伪装成人工标签。 |
 
-对短而泛化的评论，默认 `decision=review`。此默认用于降低证据不足时的自动判断，不代表已完成标注。四类人工标注标签 `exact`、`near`、`distinct`、`uncertain` 与三类预测决策不是一一等价：预测决策是系统输出，人工标签是评估参考，应分字段、分表保存。
+对短而泛化的评论，默认 `decision=review`。此默认用于降低证据不足时的自动判断，不代表已完成标注。四类参考标签 `exact`、`near`、`distinct`、`uncertain` 与三类预测决策不是一一等价：预测决策是系统输出，本次AI辅助标签是评估参考（未经人类金标准复核），应分字段、分表保存。
 
 ## 3. 方法标识
 
@@ -46,7 +46,7 @@
 | D | 预训练 MiniLM 语义方法。 |
 | E | 结合词面与语义特征的逻辑回归方法。 |
 
-不训练星级预测模型或情感模型。不得把星级、情感或用户信息用作重复性标签依据。人工标签与合成标签分开管理；随机评论对不能直接作为负例。
+不训练星级预测模型或情感模型。不得把星级、情感或用户信息用作重复性标签依据。AI辅助真实对标签与合成标签分开管理；随机评论对不能直接作为负例。
 
 ## 4. 接入示例
 
@@ -77,9 +77,9 @@ pair_id | asin | review_id_a | review_id_b | method | score | decision | reason
 - `decision` 表示当前方法给出的操作性结果。`review` 应保留为可复核结果，不要强行并入 `duplicate` 或 `distinct`。
 - 不做基于预测边的传递闭包分组。若 A 与 B 判为重复、B 与 C 判为重复，不据此自动推断 A 与 C 重复或将三者归为同一组。
 - 结果范围受同 ASIN、热门商品优先、每商品 cap 100 的有限流式采样限制；不代表全量或均匀随机覆盖。不要据此用评论计数给全部商品做总体排名。
-- 当前规划的人工集为 600 对（train 300、validation 150、test 150），先以 train 60 对进行 pilot。测试标签在阈值锁定后才用于最终评价。不得泄漏测试标签用于选择方法或阈值。
+- 当前固定真实对标注集为6,000对（train4,000、validation1,000、test1,000），保留原600与1200阶段，先以 train 60 对进行 pilot。测试标签在阈值锁定后才用于最终评价。不得泄漏测试标签用于选择方法或阈值。
 - 本契约不报告标注完成情况、模型训练状态、阈值、指标或实测结果；任何后续结果应附对应数据版本、方法版本和评估范围。
 
 ## 6. 实现对照
 
-实际调用为 predict_pairs([(text_a,text_b), ...]) 和 score_product(DataFrame[asin,review_id,text])，每对5行；正文接口使用虚拟文本编号，商品接口使用真实review_id。当前状态与输入失败处理以 runbook.md 和 implementation_status.md 为准。当前预览中未训练C/E分数为空，全部decision=review；不作为自动降权证据。
+实际调用为 predict_pairs([(text_a,text_b), ...]) 和 score_product(DataFrame[asin,review_id,text])，每对5行；正文接口使用虚拟文本编号，商品接口使用真实review_id。当前状态与输入失败处理以 runbook.md 和 implementation_status.md 为准。模型锁定前的预览C/E分数为空；锁定后的完整交接提供五方法分数。由于只有富集AI基准证据，完整交接也保持decision=review，不作为自动降权证据。

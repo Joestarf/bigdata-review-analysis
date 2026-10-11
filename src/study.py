@@ -9,12 +9,15 @@ def main():
     parser=argparse.ArgumentParser(description="Review redundancy study, with sealed labels and explicit acceptance gates")
     parser.add_argument("--root",type=Path,default=ROOT)
     subs=parser.add_subparsers(dest="command",required=True)
-    for name in ["audit","embed","pairs","prepare","synthesize","train","evaluate","handoff","infer","benchmark","validate","status","explore-labels","extend","scale","activate-scale","sync-scale"]:
+    for name in ["audit","embed","pairs","prepare","synthesize","train","evaluate","handoff","infer","benchmark","validate","status","explore-labels","extend","scale","activate-scale","sync-scale","report"]:
         subs.add_parser(name)
     serve=subs.add_parser("serve");serve.add_argument("--port",type=int,default=8765)
     args=parser.parse_args();root=args.root.resolve()
     try:
         match args.command:
+            case "report":
+                from .reporting import build_report
+                build_report(root)
             case "audit":
                 from .audit import run_audit
                 run_audit(root)

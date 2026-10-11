@@ -32,7 +32,7 @@ def bounded_metrics(y, predicted):
     result = metrics(y[known],predicted[known])
     total = int(predicted.sum()); unresolved = int((predicted & ~known).sum())
     result.update({"full_rows":len(y),"automatic_candidate_positive":total,
-                   "unresolved_positive":unresolved,
+                   "unresolved_positive":unresolved,"precision_bound_defined":bool(total>0),
                    "precision_lower":result["tp"]/total if total else 0.,
                    "precision_upper":(result["tp"]+unresolved)/total if total else 0.})
     return result
@@ -109,6 +109,7 @@ def train(root:Path=ROOT):
     allowed=automatic_allowed(val_labels,df)
     yval=val_labels.target.to_numpy(dtype=float)
     models,configs,rows={},{},[]
+    hyperparameters=[]
     for method,cols in [("C",5),("E",6)]:
         candidates=[]
         for c in [.1,1.,10.]:
@@ -118,6 +119,9 @@ def train(root:Path=ROOT):
             selection=choose_threshold(yval,scores,allowed)
             # F1 at 0.5 is only a fallback for choosing a review-only candidate.
             fallback=bounded_metrics(yval,(scores>=.5)&allowed)
+            hyperparameters.append({"method":method,"C":c,"qualified":selection is not None,
+                                    "threshold":selection["threshold"] if selection else .5,
+                                    **(selection if selection else fallback)})
             candidates.append((selection, fallback, c,model))
         accepted=[r for r in candidates if r[0] is not None]
         chosen=max(accepted,key=lambda r:(r[0]["recall"],r[0]["precision_lower"],-r[2])) if accepted else max(candidates,key=lambda r:(r[1]["f1"],-r[2]))
@@ -162,6 +166,7 @@ def train(root:Path=ROOT):
           "score_meanings":{"A":"normalized exact-match flag","B":"character TF-IDF cosine",
                            "C":"logistic classifier score, not calibrated duplicate probability",
                            "D":"normalized encoder cosine","E":"logistic classifier score, not calibrated duplicate probability"}}
+    write_csv(root/"results/tables/validation_hyperparameters.csv",pd.DataFrame(hyperparameters))
     write_csv(root/"results/tables/validation_comparison.csv",pd.DataFrame(rows))
     write_json(root/"models/model_lock.json",lock)
     print(f"Models locked. Selected method={best}; automatic validation target met={best is not None}. Test labels remain unopened.")

@@ -135,6 +135,27 @@ def handoff(root=ROOT,count=10):
                "note":"AI benchmark scores; review decisions require independent review before downstream weighting."})
     return {"products":len(products),"reviews":len(reviews),"pairs":len(results)//5,"path":str(out)}
 
+def validate_inference(root=ROOT):
+    """Verify a completed local inference receipt before claiming completion."""
+    from .evaluation import validate_evaluation
+    validate_lock(root);validate_evaluation(root)
+    df,manifest=load_study(root)
+    path=root/"results/predictions/pair_scores.csv.gz"
+    receipt=root/"results/predictions/manifest.json"
+    if not path.exists() or not receipt.exists():raise GateError("Full inference output or receipt is missing.")
+    fm=read_json(receipt)
+    expected=sum(len(g)*(len(g)-1)//2 for _,g in df.groupby("asin"))
+    if (fm.get("dataset_version")!=manifest["dataset_version"]
+        or fm.get("pairs")!=expected or fm.get("method_rows")!=expected*len(METHODS)
+        or fm.get("products")!=int(df.asin.nunique()) or fm.get("methods")!=METHODS
+        or fm.get("output_sha256")!=sha_file(path)
+        or fm.get("model_lock_sha256")!=sha_file(root/"models/model_lock.json")
+        or fm.get("final_evaluation_sha256")!=sha_file(root/"results/tables/final_evaluation.json")):
+        raise GateError("Full inference provenance/count/checksum mismatch.")
+    if fm.get("decision_counts")!={"review":expected*len(METHODS)} or fm.get("population_automatic_ready") is not False:
+        raise GateError("Unvalidated population automatic decisions present.")
+    return fm
+
 def infer_all(root=ROOT):
     predictor=Predictor(root)
     if not predictor.lock:raise GateError("Full inference requires a locked model and final test evaluation.")
@@ -145,7 +166,8 @@ def infer_all(root=ROOT):
     path=root/"results/predictions/pair_scores.csv.gz"
     path.parent.mkdir(parents=True,exist_ok=True)
     temporary=path.with_suffix(".partial")
-    count=0;method_rows=0;decision_counts={}
+    count=0;method_rows=0;decision_counts={};candidate_counts={m:0 for m in METHODS}
+    long_ids=set(predictor.df.loc[predictor.df.text.map(word_count).ge(5),"review_id"])
     from .performance import Monitor
     with Monitor() as monitor:
         with temporary.open("wb") as raw:
@@ -161,6 +183,10 @@ def infer_all(root=ROOT):
                             writer=csv.writer(handle);writer.writerow(result.columns)
                         writer.writerows(result.fillna("").itertuples(index=False,name=None))
                         count+=expected;method_rows+=len(result)
+                        eligible=result.review_id_a.isin(long_ids)&result.review_id_b.isin(long_ids)
+                        for m in METHODS:
+                            threshold=predictor.lock["methods"][m]["review_threshold"]
+                            candidate_counts[m]+=int((result.method.eq(m)&eligible&result.score.ge(threshold)).sum())
                         for key,value in result.decision.value_counts().items():
                             decision_counts[key]=decision_counts.get(key,0)+int(value)
                         if k%100==0:print(f"Inference products={k}, pairs={count}",flush=True)
@@ -172,6 +198,8 @@ def infer_all(root=ROOT):
                "methods":METHODS,"full_within_product_pairs":True,"no_transitive_clustering":True,
                "output_sha256":sha_file(path),"model_lock_sha256":sha_file(root/"models/model_lock.json"),
                "final_evaluation_sha256":sha_file(final),"performance":monitor.result,
-               "decision_counts":decision_counts,"score_meanings":predictor.lock["score_meanings"],
+               "decision_counts":decision_counts,"candidate_positive_by_method":candidate_counts,
+               "candidate_count_note":"Threshold signals, not confirmed redundant pairs or natural prevalence",
+               "score_meanings":predictor.lock["score_meanings"],
                "population_automatic_ready":False,"compression":"gzip with deterministic mtime=0"})
     return {"pairs":count,"method_rows":method_rows,"output":str(path)}

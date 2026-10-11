@@ -47,3 +47,36 @@
 
 ## scale6000 增量首批200对
 已逐对全文阅读blind_train前200对，保存增量标签；未修改原300标签。增量仍为AI辅助来源，未获得独立人类复核。当前仅完成200/3700，不宣称全部完成。
+
+## scale6000 前1800对首轮与质量回看
+来源：AI辅助逐对正文盲审；仅前1800行，原300标签不修改。首轮1800/1800：exact0、near99、distinct1075、uncertain626。后1900行留空，由其他审阅者独立处理。
+先完整回读全部99个near，按冻结指南检查泛化共同优点、额外实质信息和理由超出正文。修订如下（行号仅指blind_train.csv固定行序，pair_id为主键）：
+| 行号 | pair_id | 旧标签 | 新标签 | 原因 |
+|---:|---|---|---|---|
+| 20 | 66cd2ecd5dc453e0fabb2c5cda7b1e844a74eaf3ffba5e39fdd51826ee6f8217 | near | uncertain | B仅称容易刮花且未指定对象，不能确定与屏膜同一故障 |
+| 126 | 2e5ece497c83078962e740c546cc97acef574f371548a4dc426649da0f1b1675 | near | uncertain | 显示手机颜色并保护的描述较笼统，缺少具体型号、条件或经历 |
+| 238 | 39bd682c72fced580edb1f41798e03477240d84e45c2147c960ca1410ee59a4a | near | distinct | 侧边插线避免家具挤压与贴墙不凸出的结构描述不同，不能推断同一设计 |
+| 470 | a4dfb85617957ba3ce713db36a151cb1a4ebb5d1a9087731cda7164e28a12fae | near | distinct | 完全不能扫描与重录后偶有成功的结论不同，不能仅按共同失败主题判近重复 |
+| 537 | 6711fd022c5501eb941f351e49a595fadcbf8735026e0ed250aba6f69effc3c9 | near | uncertain | 圣诞袜礼物满意是通用购买背景，不能支持具体内容重复 |
+| 644 | 3854aff05a25132cfd81c8374478fb8fb92dc164b2346cb22bcfd5a710d45fce | near | uncertain | 风口架结实满意的笼统评价没有具体固定机制或条件 |
+| 731 | 42da7564379ed166f9e22244cb3735d8895ea81ba2bed1d41121ee842784f732 | near | uncertain | 强磁及坚固泛评没有具体对象、道路或承重条件 |
+| 743 | 28d157261a468586eb21cc40adcdbb05ed10c08d6b6ed3773b14a6e558e80e0a | near | uncertain | 磁力很强属一般优点评价，B缺少具体持手机条件 |
+| 751 | b8e850ce07b1139651fa9b3fe2d6b713f54bebccabdeef729e68ca6272a7a4e4 | near | distinct | 共同降噪差之外，电池续航评价与微小噪声被放大的信息不同 |
+| 766 | fc66125bf9381033925062c4c2c99a6564311c6dafec03c8643b678be4aa2322 | near | distinct | 换尖不丢笔主题相近，但按压和粘膜损尖、小屏准确度是新增实质内容 |
+| 770 | 898f819c20204db2814fad0699d6a090b8906f121f860a3e77fb6edd1078172b | near | distinct | 容易贴且触控好相近，但附对位框这一配置为新信息 |
+| 800 | 49aa5e6c583c0361fd4d44548be0c9716f70b216a1cf56386fbd1a5dd072d591 | near | distinct | 裂膜保屏主题相近，但B明确iPhone6且是上一片膜的经历 |
+| 884 | e95952166f89114f43ab0d093b311d986dd035b790c1e23432e5b8723a282a2a | near | distinct | 链扣方便的泛评与明确挂钥匙链携带的用途不同 |
+| 988 | f7cdb09b581d0d57bf7879b8ddd982881afee289343b1b3edb1c9b4f6e268f33 | near | distinct | 对位框易装相近，但明确两分钟操作时间是额外事实 |
+| 1075 | fc5653c37d629fb2b9d1201bb2472eb7b4fe90491ebd16c5099dce2b1ab0ee5b | near | distinct | 摩托车安装用途相近，但GPS公路旅行及易装是新增信息 |
+| 1156 | e12941d209272395753d72f3b32a26adc551b7e03140e4f533a92539642189d6 | near | distinct | 比Otterbox便宜相近，但二次复购及抗跌耐久是新增具体内容 |
+| 1309 | 0f38f4920fa3d71951291bf2bc8c44598d30265b185d92a5e559a1a6454c5acf | near | uncertain | B没有说明替换金属片，只称车架使用好，缺少部件依据 |
+| 1317 | 894f8f68f28424e1cf848a1630eaa7a285a44a0c21d8f3ad15f1f3ae77ae6f4c | near | uncertain | A明确挂绳本体断，B不清楚是挂绳或附件连接处断，不能强判 |
+| 1328 | d57f58ed0a0b37a8f5a1941ff1b42de370c93629ee778ea8bc80cfc3dde1eee0 | near | distinct | 吸力易装相近，但调整便利及质感为新增评价内容 |
+| 1530 | 80a78faba82db41f5cdcfbb8ba855298872fd02d41dfb315843ef267c3c79347 | near | distinct | 旧iPad使用相近，但A是恢复缺线不可用，B为备用线且代际推测 |
+| 1602 | 836bfe81cfe1425ca0c5287097145c224783b4d0a1ea378c2661aa6b3f0e1ddf | near | uncertain | 给手机和iPad充电的通用赞语没有具体机型或条件 |
+| 1663 | b25e8bf7e37c2f77da5184968a51702593d7bcd8babb6af3d85693b3ee77402b | near | uncertain | 观看教程易装贴合的通用套语未有步骤或型号细节 |
+| 1697 | b9b170a7bb3d58c149b43e9661f7fcded66467c311c71c891020fff3b37878f9 | near | distinct | 多个笔尖与明确三笔尖数量不等价，A未明确可换尺寸，旧理由超出正文 |
+
+### 前1800对不确定项复读完成
+
+在近似重复复审之后，再逐对完整复读当前636个 uncertain 的两段正文及原理由（分批60对，末批36对）。保持636项为 uncertain，无新增改标签；通用质量、易装、快充及品牌赞美仍未强行视为具体信息重复，短正文不足以确认另一侧新增故障/型号/条件时保持不确定。前1800对最终计数：exact 0、near 76、distinct 1088、uncertain 636。最初99个near全部已复读，23项更正详情见上表。主sheet后1900行仍为空白，留给独立审阅者/根任务合并。本节为AI辅助逐对判断与同审阅者复读，不能充当人类独立金标准。

@@ -344,4 +344,74 @@ class StudyInvariantTests(unittest.TestCase):
                           abs(la-lb),float(a.casefold()==b.casefold())]
                 self.assertEqual(prepared_structural_features(prepare_structure(a),prepare_structure(b)),expected)
 
+
+    def test_reporting_refuses_unlocked_test_before_table_read(self):
+        from src.reporting import build_report
+        with tempfile.TemporaryDirectory() as directory:
+            with patch("src.reporting.pd.read_csv") as reader:
+                with self.assertRaises(GateError):build_report(Path(directory))
+                reader.assert_not_called()
+
+    def test_full_inference_writes_deterministic_gzip_and_provenance(self):
+        from src.inference import infer_all
+        from types import SimpleNamespace
+        import gzip
+        from src.common import read_json
+        data=pd.DataFrame({"asin":["A","A"],"review_id":["r1","r2"],
+                           "text":["A battery lasts ten hours daily.","This phone does not charge at all."]})
+        output=pd.DataFrame([{"pair_id":"p","asin":"A","review_id_a":"r1","review_id_b":"r2",
+                              "method":m,"score":.6,"decision":"review","reason":"fixture"} for m in ["A","B","C","D","E"]])
+        lock={"methods":{m:{"review_threshold":.5} for m in ["A","B","C","D","E"]},"score_meanings":{}}
+        predictor=SimpleNamespace(lock=lock,df=data,manifest={"dataset_version":"fixture"},score_product=lambda _:output)
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            write_json(root/"models/model_lock.json",{"fixture":True})
+            write_json(root/"results/tables/final_evaluation.json",{"fixture":True})
+            with patch("src.inference.Predictor",return_value=predictor),patch("src.evaluation.validate_evaluation"):
+                infer_all(root)
+            path=root/"results/predictions/pair_scores.csv.gz"
+            self.assertEqual(path.read_bytes()[4:8],bytes(4))
+            with gzip.open(path,"rt") as file:self.assertEqual(len(pd.read_csv(file)),5)
+            receipt=read_json(path.parent/"manifest.json")
+            self.assertEqual(receipt["pairs"],1);self.assertEqual(receipt["method_rows"],5)
+            self.assertEqual(receipt["output_sha256"],sha_file(path))
+            self.assertEqual(receipt["candidate_positive_by_method"],{m:1 for m in ["A","B","C","D","E"]})
+            self.assertEqual(receipt["decision_counts"],{"review":5})
+
+
+    def test_bootstrap_precision_undefined_with_no_predictions(self):
+        from src.evaluation import product_bootstrap
+        frame=pd.DataFrame({"asin":["A","A","B","B"],"target":[0,1,0,1],"predicted":[False]*4})
+        result=product_bootstrap(frame,200)
+        self.assertEqual(result["status"],"ok")
+        self.assertIsNone(result["precision_low"]);self.assertEqual(result["precision_valid_resamples"],0)
+        self.assertEqual(result["recall_low"],0.);self.assertEqual(result["f1_high"],0.)
+        self.assertEqual(result,product_bootstrap(frame,200))
+
+    def test_bounded_precision_is_undefined_without_candidate_predictions(self):
+        from src.training import bounded_metrics
+        result=bounded_metrics([1,0,np.nan],[False,False,False])
+        self.assertFalse(result["precision_bound_defined"])
+
+
+    def test_inference_receipt_rejects_modified_output(self):
+        from src.inference import validate_inference
+        data=pd.DataFrame({"asin":["A","A"]})
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);path=root/"results/predictions/pair_scores.csv.gz"
+            path.parent.mkdir(parents=True);path.write_bytes(b"fixture")
+            write_json(root/"models/model_lock.json",{"fixture":True})
+            write_json(root/"results/tables/final_evaluation.json",{"fixture":True})
+            receipt={"dataset_version":"v","pairs":1,"method_rows":5,"products":1,
+                     "methods":["A","B","C","D","E"],"output_sha256":sha_file(path),
+                     "model_lock_sha256":sha_file(root/"models/model_lock.json"),
+                     "final_evaluation_sha256":sha_file(root/"results/tables/final_evaluation.json"),
+                     "decision_counts":{"review":5},"population_automatic_ready":False}
+            write_json(path.parent/"manifest.json",receipt)
+            with patch("src.inference.validate_lock"),patch("src.evaluation.validate_evaluation"),\
+                 patch("src.inference.load_study",return_value=(data,{"dataset_version":"v"})):
+                self.assertEqual(validate_inference(root)["pairs"],1)
+                path.write_bytes(b"changed")
+                with self.assertRaisesRegex(GateError,"checksum"):validate_inference(root)
+
 if __name__=="__main__":unittest.main()

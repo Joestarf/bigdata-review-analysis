@@ -17,3 +17,7 @@ models/
 # Local executed artifacts and sealed test review
 notebooks/data_quality_audit.ipynb
 report/test_annotation_review.md
+
+results/predictions/
+
+results/handoff/
