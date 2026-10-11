@@ -63,6 +63,8 @@ def protected_paths(root):
            "models/embedding_manifest.json","models/embedding_index.csv",
            "models/C.joblib","models/E.joblib",
            "src/common.py","src/features.py","src/embedding.py","src/inference.py","src/training.py","src/evaluation.py","src/annotations.py","src/synthetic.py"]
+    paths += [p for p in ["data/annotation/original600/pair_metadata.csv","data/annotation/original1200/pair_metadata.csv"]
+              if (root/p).exists()]
     return {p:sha_file(root/p) for p in paths}
 
 def validate_lock(root=ROOT):

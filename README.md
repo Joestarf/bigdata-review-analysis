@@ -60,7 +60,7 @@ Dataset source: [Amazon Reviews 2023 on Hugging Face](https://huggingface.co/dat
 
 当前固定样本90,750条/1,000ASIN。正在按预先固定规则将600对AI辅助标注扩展至6,000对（训练4000、验证1000、测试1000；保留原600与1200阶段），并落实GPT-6.1 Sol独立审核修正。结果限定为AI标注的富集基准；全量交接保持待复核。
 
-详细状态见 [实测交付报告](report/implementation_status.md)，复现及接口见 [运行说明](report/runbook.md)，标注定义见 [标注指南](report/annotation_guide.md)。[审计notebook](notebooks/data_quality_audit.ipynb)已完整执行。
+详细状态见 [实测交付报告](report/implementation_status.md)，复现及接口见 [运行说明](report/runbook.md)，标注定义见 [标注指南](report/annotation_guide.md)。本地审计notebook已执行；仓库提供[无输出复现模板](notebooks/data_quality_audit_template.ipynb)。
 
 ~~~bash
 cd /home/joestar/code/bigdata-review-analysis

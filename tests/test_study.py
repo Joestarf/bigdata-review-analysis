@@ -269,4 +269,23 @@ class StudyInvariantTests(unittest.TestCase):
                 with self.assertRaises(GateError):read_labels(Path(directory),"test")
                 reader.assert_not_called()
 
+    def test_benchmark_qualified_model_remains_review_for_population(self):
+        from src.inference import Predictor
+        p=Predictor.__new__(Predictor)
+        p.lock={"population_automatic_ready":False,"methods":{"A":{"qualified":True,"threshold":1.}}}
+        decision,reason=p._decision("A",1.,"Battery lasts for ten hours.","Battery lasts for ten hours.")
+        self.assertEqual(decision,"review")
+        self.assertIn("benchmark",reason)
+
+    def test_historical_cohorts_are_protected_when_present(self):
+        from src.training import protected_paths
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            names=["data/annotation/original600/pair_metadata.csv","data/annotation/original1200/pair_metadata.csv"]
+            for name in names:
+                (root/name).parent.mkdir(parents=True,exist_ok=True);(root/name).touch()
+            with patch("src.training.sha_file",return_value="fixture"):
+                protected=protected_paths(root)
+            for name in names:self.assertIn(name,protected)
+
 if __name__=="__main__":unittest.main()

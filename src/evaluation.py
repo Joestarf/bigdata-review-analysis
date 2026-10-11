@@ -62,10 +62,12 @@ def evaluate(root=ROOT):
         # Review-only fallback is evaluated as a candidate, never automatic-ready.
         threshold=config["review_threshold"]
         predicted=(scores[m]>=threshold)&allowed
-        review=(~allowed) | (not config["qualified"])
+        benchmark_review=(~allowed) | (not config["qualified"])
+        review=benchmark_review | (lock.get("population_automatic_ready") is not True)
         result=bounded_metrics(test.target.to_numpy(dtype=float),predicted)
         comparisons.append({"method":m,"split":"test","threshold":threshold,"qualified_validation":config["qualified"],
-                            "evaluation_mode":"automatic" if config["qualified"] else "exploratory_candidate",
+                            "evaluation_mode":"benchmark_qualified_candidate" if config["qualified"] else "exploratory_candidate",
+                            "population_automatic_ready":bool(lock.get("population_automatic_ready",False)),
                             **result,"uncertain":int((~definite).sum()),"review":int(review.sum()),
                             "annotation_source":"AI_assisted_review"})
         original_ids=set(pd.read_csv(root/"data/annotation/original600/pair_metadata.csv").pair_id) if (root/"data/annotation/original600/pair_metadata.csv").exists() else set(test.pair_id)
@@ -90,9 +92,10 @@ def evaluate(root=ROOT):
                                    "review":int(review[mask].sum())})
         for i,r in enumerate(test.itertuples()):
             decision="review" if review[i] else ("duplicate" if predicted[i] else "distinct")
+            benchmark_decision="review" if benchmark_review[i] else ("duplicate" if predicted[i] else "distinct")
             predictions.append({"pair_id":r.pair_id,"asin":r.asin,"review_id_a":r.review_id_a,"review_id_b":r.review_id_b,
                                 "method":m,"score":float(scores[m][i]),"candidate_positive":bool(predicted[i]),
-                                "decision":decision,"label":r.label,"reason":r.reason,"short":bool(r.short),"truncated":bool(r.truncated)})
+                                "decision":decision,"benchmark_decision":benchmark_decision,"label":r.label,"reason":r.reason,"short":bool(r.short),"truncated":bool(r.truncated)})
     output=root/"results/tables"
     write_csv(output/"test_comparison.csv",pd.DataFrame(comparisons))
     write_csv(output/"test_breakdowns.csv",pd.DataFrame(breakdowns))
