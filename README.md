@@ -60,7 +60,7 @@ Dataset source: [Amazon Reviews 2023 on Hugging Face](https://huggingface.co/dat
 
 当前固定样本90,750条/1,000ASIN。评论对基准固定为6,000对（训练4000、验证1000、测试1000；保留原600与1200批次），采用按商品划分和正文隔离。标注来源与适用范围见标注指南；全量交接保持待复核。
 
-详细状态见 [实测交付报告](report/implementation_status.md)，复现及接口见 [运行说明](report/runbook.md)，标注定义见 [标注指南](report/annotation_guide.md)。本地审计notebook已执行；仓库提供[无输出复现模板](notebooks/data_quality_audit_template.ipynb)。
+实测结果见 [实验与交接报告](report/experiment_results.md)，完成状态见 [实现状态](report/implementation_status.md)，复现及接口见 [运行说明](report/runbook.md)，标注定义见 [标注指南](report/annotation_guide.md)。本地审计notebook已执行；仓库提供[无输出复现模板](notebooks/data_quality_audit_template.ipynb)。
 
 ~~~bash
 cd /home/joestar/code/bigdata-review-analysis
@@ -71,5 +71,7 @@ cd /home/joestar/code/bigdata-review-analysis
 ~~~
 
 本地复核页面：http://localhost:8765 。稳定旁表位于data/processed/；标注位于data/annotation/；语义缓存位于models/；10商品交接预览位于results/handoff/。五字段reviews.csv保持原版本，改进清洗与旧版的12条正文差异已经单独记录。
+
+6,000对参考标签及五方法训练、最终测试已经完成；没有方法达到预设验证选型目标。当前词面与词面加语义逻辑回归的测试结果一致，全部候选用于复核。详细指标、样本数和适用范围见实验报告。
 
 模型代码仅使用正文特征，测试标签与训练隔离。冻结预训练MiniLM参数，不训练星级、情感或评论者身份模型，也不生成评分权重或传递重复组。

@@ -67,7 +67,7 @@ def build_report(root:Path=ROOT):
         for (i,j),n in np.ndenumerate(matrix):ax.text(j,i,str(n),ha="center",va="center",color="white" if n>vmax*.5 else "black")
         ax.set(title=r.method,xticks=[0,1],xticklabels=["Distinct","Duplicate"],
                yticks=[0,1],yticklabels=["Distinct","Duplicate"],xlabel="Candidate prediction")
-    axes[0].set_ylabel("AI reference label")
+    axes[0].set_ylabel("Reference label")
     fig.savefig(figures/"test_confusion_matrices.png",dpi=160);plt.close(fig)
     pivot=counts.pivot(index="split",columns="label",values="n").reindex(["train","validation","test"])
     fig,ax=plt.subplots(figsize=(7,4),layout="constrained")
@@ -79,7 +79,7 @@ def build_report(root:Path=ROOT):
     selected=lock["selected_method"] or "none"
     scope="验证选型目标没有方法达标；五方法保留为探索性候选。" if selected=="none" else f"在固定富集验证集上选定{selected}；不能据此宣称自然场景精确率达到95%。"
     e=test.set_index("method").loc["E"];c=test.set_index("method").loc["C"]
-    delta=f"E相对C的测试precision差{(e.precision-c.precision)*100:+.2f}个百分点、recall差{(e.recall-c.recall)*100:+.2f}个百分点、F1差{(e.f1-c.f1)*100:+.2f}个百分点。这是观察差异，不是显著性结论，也不能据测试差异重选模型。"
+    delta=f"E相对C的测试precision差{(e.precision-c.precision)*100:+.2f}个百分点、recall差{(e.recall-c.recall)*100:+.2f}个百分点、F1差{(e.f1-c.f1)*100:+.2f}个百分点。这是观察差异，不是显著性结论，也不能据测试差异重选模型。语义向量缓存约133MiB，额外编码耗时见性能节；当前配置没有观察到这一成本带来的增量收益。"
     interval_rows=[]
     for m in METHODS:
         r=ci.loc[m]
@@ -97,7 +97,7 @@ def build_report(root:Path=ROOT):
 
 已完成固定数据审计、6,000对真实评论的自动辅助标注、2,000个合成训练正例与100个变换审阅、A—E五方法训练/对照、参数锁定后一次最终测试，以及全部同ASIN对推断。{scope}
 
-标签未经独立人类金标准复核；候选按相似度、随机和短文配额富集。评价只说明这一固定AI标注集上的表现，不能估计自然重复率或判断水军。全量输出全部review，不直接赋予降权权重，不生成传递重复组。
+标签未经独立人类金标准复核；候选按相似度、随机和短文配额富集。评价只说明这一固定参考标签集上的表现，不能估计自然重复率或判断水军。全量输出全部review，不直接赋予降权权重，不生成传递重复组。
 
 ## 数据与版本
 
@@ -108,11 +108,21 @@ def build_report(root:Path=ROOT):
 - 有界扫描100万、局部缓冲打乱、按观测频次挑1,000商品、每商品最多100条；不是类别总体均匀随机抽样。未保留parent_asin，原下载revision未记录。
 - 改进清洗与旧版本12条差异留表；原五字段CSV未改写。异常排除及全部字段见data_audit.md。
 
+## 方法定义
+
+|方法|实现|分数含义|
+|---|---|---|
+|A|规范化精确匹配|相同正文标记0/1|
+|B|字符TF-IDF阈值|字符3—5 gram余弦相似度|
+|C|词面特征逻辑回归|未校准分类器输出|
+|D|固定MiniLM语义向量阈值|语义向量余弦相似度|
+|E|词面加语义特征逻辑回归|未校准分类器输出|
+
 ## 标签与训练
 
 {markdown_table(counts)}
 
-同商品分组划分700/150/150个ASIN；跨集合相同规范化正文进入公共模板池。保留原600与1200批次，最终批次固定在模型拟合之前，不依据测试成绩补标。训练只用确定AI标签{lock['training_manual_rows']}对；uncertain不强行转为负例。
+同商品分组划分700/150/150个ASIN；跨集合相同规范化正文进入公共模板池。保留原600与1200批次，最终批次固定在模型拟合之前，不依据测试成绩补标。训练只用确定参考标签{lock['training_manual_rows']}对；uncertain不强行转为负例。
 
 合成训练{lock['synthetic_rows']}对，总权重{lock['synthetic_total_weight']:.2f}，真实确定训练权重{lock['manual_total_weight']}；合成占合并权重20%。复制、空格、大小写、标点和受限拼写变动各审20例，来源均为训练评论。
 
@@ -126,13 +136,13 @@ TF-IDF仅拟合训练记录，char_wb 3—5 gram/min_df2/max100,000。C/E数值�
 
 {markdown_table(display)}
 
-无正预测时precision及其区间无定义，图中标为N/A；CSV数值0需结合precision_defined=False解读，不能解释为产生了错误正预测。精确匹配A只覆盖相同措辞，监督池移除公共模板和记录副本后，自然完全匹配正例可能很少。
+C/E各只有3个确定标签上的正预测（2真阳性、1假阳性），另有14个不确定正候选；66.67%不包含这些不确定项，不能视为稳定高精确率。\n\n无正预测时precision及其区间无定义，图中标为N/A；CSV数值0需结合precision_defined=False解读，不能解释为产生了错误正预测。精确匹配A只覆盖相同措辞，监督池移除公共模板和记录副本后，自然完全匹配正例可能很少。
 
 ### 商品bootstrap，1,000次、seed42
 
 {markdown_table(pd.DataFrame(interval_rows))}
 
-重采样单位为ASIN，有效重采样不足时标为unavailable。区间反映该富集AI基准的不确定性，未证明自然场景95%精确率。
+重采样单位为ASIN，有效重采样不足时标为unavailable。区间反映该富集参考标签基准的不确定性，未证明自然场景95%精确率。
 
 ### 语义增量
 
@@ -142,9 +152,9 @@ MiniLM固定revision {emeta['model_revision']}，384维、float32归一化、最
 
 ## 错误与合成检查
 
-error_cases.csv提供{len(cases)}个错误/不确定案例及正文、参考理由、五方法分数和下游风险；各类最多10个、不足全部展示。具体原因复核记录见error_cases_review.csv（若存在）。全量待复核不会自动误降权。
+error_cases.csv提供{len(cases)}个错误/不确定案例及正文、参考理由、五方法分数和下游风险；各类最多10个、不足全部展示。案例按E方法已锁定的探索阈值整理，并附五种方法分数；不是全体方法错误的全集。具体原因复核记录见error_cases_review.csv及error_analysis.md。全量待复核不会自动误降权。
 
-合成测试只使用测试集合原评论，单独报告已知复制/扰动检出率，precision/F1因只有正例而无定义。详见synthetic_test_detection.csv，共{len(synthetic)}个方法/变换组合；不替代真实评价。
+合成测试只使用测试集合原评论，单独报告已知复制/扰动检出率，precision/F1因只有正例而无定义。详见synthetic_test_detection.csv，共{len(synthetic)}个方法/变换组合；C/E对本批复制及扰动全部检出，但真实近似重复召回仍低，说明这些合成变换的难度与真实改写不同，不替代真实评价。
 
 ## 性能与全量结果
 
@@ -171,6 +181,9 @@ error_cases.csv提供{len(cases)}个错误/不确定案例及正文、参考理�
 组员二接入时先保留review标记，另行讨论降权政策。若要宣称自然场景可自动降权，后续需要独立人类双人标注和自然抽样的验证集，再固定新的实验版本；当前结论足以交付方法比较与复核接口。
 """
     (root/"report/experiment_results.md").write_text(narrative,encoding="utf-8")
+    write_json(tables/"report_receipt.json",{"model_lock_sha256":sha_file(root/"models/model_lock.json"),
+               "final_evaluation_sha256":sha_file(tables/"final_evaluation.json"),
+               "report_sha256":sha_file(root/"report/experiment_results.md"),"git_tip_at_generation":git_tip})
     inventory=[]
     for directory in ["data","models","results","report","notebooks"]:
         for path in sorted((root/directory).rglob("*")):
@@ -178,8 +191,5 @@ error_cases.csv提供{len(cases)}个错误/不确定案例及正文、参考理�
                 inventory.append({"path":str(path.resolve()),"relative_path":str(path.relative_to(root)),
                                   "bytes":path.stat().st_size,"sha256":sha_file(path)})
     write_csv(tables/"artifact_inventory.csv",pd.DataFrame(inventory))
-    write_json(tables/"report_receipt.json",{"model_lock_sha256":sha_file(root/"models/model_lock.json"),
-               "final_evaluation_sha256":sha_file(tables/"final_evaluation.json"),
-               "report_sha256":sha_file(root/"report/experiment_results.md"),"git_tip_at_generation":git_tip})
     print(f"Report and figures created; {len(inventory)} artifacts inventoried.")
 
