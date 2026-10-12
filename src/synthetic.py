@@ -35,6 +35,7 @@ def generate_synthetic(df):
     rng=np.random.default_rng(SEED)
     eligible=df[(df.split == "train") & df.supervised_eligible & df.text.map(word_count).ge(10)]
     if len(eligible)<1000:raise GateError("Insufficient long training sources for synthetic examples.")
+    forbidden={normalize_text(t) for t in df.loc[df.split.isin(["validation","test"])&df.supervised_eligible,"text"]}
     source=eligible.iloc[rng.permutation(len(eligible))]
     rows=[]
     for r in source.head(1000).itertuples():
@@ -45,7 +46,7 @@ def generate_synthetic(df):
         count=0
         for r in source.itertuples():
             b=transform_text(r.text,kind,rng)
-            if b is None:continue
+            if b is None or normalize_text(b) in forbidden:continue
             rows.append({"pair_id":sha_text(r.review_id+":"+kind),"asin":r.asin,"split":"train",
                 "source_review_id":r.review_id,"variant_id":sha_text(r.review_id+":variant:"+kind),
                 "text_a":r.text,"text_b":b,"label":"exact" if normalize_text(r.text)==normalize_text(b) else "near",
@@ -63,7 +64,7 @@ def prepare_synthetic(root: Path=ROOT):
     mp=out / "synthetic_manifest.json"
     if mp.exists():
         meta=read_json(mp)
-        if meta["dataset_version"] != manifest["dataset_version"] or sha_file(out/"synthetic_pairs.csv") != meta["sha256"]:
+        if meta.get("transform_revision")!=2 or meta["dataset_version"] != manifest["dataset_version"] or sha_file(out/"synthetic_pairs.csv") != meta["sha256"]:
             raise GateError("Synthetic artifact is stale.")
         print("Using existing synthetic examples and transformation review tasks.")
         return
@@ -75,7 +76,7 @@ def prepare_synthetic(root: Path=ROOT):
     checks["annotation_version"]=""
     write_csv(out / "synthetic_review.csv",checks)
     write_json(mp,{"dataset_version":manifest["dataset_version"],"seed":SEED,"rows":len(syn),
-                   "sha256":sha_file(out/"synthetic_pairs.csv"),"check_rows":len(checks),
+                   "sha256":sha_file(out/"synthetic_pairs.csv"),"check_rows":len(checks),"transform_revision":2,
                    "label_source":"synthetic; AI-assisted transformation review authorized; no human gold standard"})
     print(f"Generated {len(syn)} synthetic positives; {len(checks)} transformation checks awaiting explicit transformation review.")
 
@@ -87,7 +88,9 @@ def approved_synthetic(root=ROOT):
     checks=pd.read_csv(root/"data/annotation/synthetic_review.csv",keep_default_na=False)
     syn=pd.read_csv(path,keep_default_na=False)
     df,manifest=load_study(root)
-    if meta["dataset_version"] != manifest["dataset_version"]:raise GateError("Synthetic dataset version mismatch.")
+    if meta.get("transform_revision")!=2 or meta["dataset_version"] != manifest["dataset_version"]:raise GateError("Synthetic dataset/configuration version mismatch.")
+    forbidden={normalize_text(t) for t in df.loc[df.split.isin(["validation","test"])&df.supervised_eligible,"text"]}
+    if set(syn.text_b.map(normalize_text))&forbidden:raise GateError("Synthetic variant matches a held-out normalized body.")
     eligible=df[(df.split=="train") & df.supervised_eligible].set_index("review_id")
     if not syn.split.eq("train").all() or not syn.label_source.eq("synthetic").all() or not syn.source_review_id.isin(eligible.index).all():
         raise GateError("Synthetic source leakage or lineage mismatch.")

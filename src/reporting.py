@@ -64,7 +64,7 @@ def build_report(root:Path=ROOT):
     for ax,r in zip(axes,test.itertuples()):
         matrix=np.array([[r.tn,r.fp],[r.fn,r.tp]],dtype=int)
         ax.imshow(matrix,cmap="Blues",vmin=0,vmax=vmax)
-        for (i,j),n in np.ndenumerate(matrix):ax.text(j,i,str(n),ha="center",va="center")
+        for (i,j),n in np.ndenumerate(matrix):ax.text(j,i,str(n),ha="center",va="center",color="white" if n>vmax*.5 else "black")
         ax.set(title=r.method,xticks=[0,1],xticklabels=["Distinct","Duplicate"],
                yticks=[0,1],yticklabels=["Distinct","Duplicate"],xlabel="Candidate prediction")
     axes[0].set_ylabel("AI reference label")

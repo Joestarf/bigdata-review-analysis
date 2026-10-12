@@ -414,4 +414,16 @@ class StudyInvariantTests(unittest.TestCase):
                 path.write_bytes(b"changed")
                 with self.assertRaisesRegex(GateError,"checksum"):validate_inference(root)
 
+
+    def test_synthetic_variants_cannot_collide_with_held_out_text(self):
+        from src.synthetic import generate_synthetic
+        text="This comfortable replacement is working perfectly with my phone every single day"
+        train_frame=pd.DataFrame({"review_id":[f"r{i}" for i in range(1000)],
+                                  "asin":["A"]*1000,"split":["train"]*1000,
+                                  "supervised_eligible":[True]*1000,"text":[text]*1000})
+        held_out=pd.DataFrame({"review_id":["v"],"asin":["B"],"split":["validation"],
+                               "supervised_eligible":[True],"text":[text+"!"]})
+        with self.assertRaisesRegex(GateError,"punctuation"):
+            generate_synthetic(pd.concat([train_frame,held_out],ignore_index=True))
+
 if __name__=="__main__":unittest.main()
