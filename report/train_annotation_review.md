@@ -80,3 +80,24 @@
 ### 前1800对不确定项复读完成
 
 在近似重复复审之后，再逐对完整复读当前636个 uncertain 的两段正文及原理由（分批60对，末批36对）。保持636项为 uncertain，无新增改标签；通用质量、易装、快充及品牌赞美仍未强行视为具体信息重复，短正文不足以确认另一侧新增故障/型号/条件时保持不确定。前1800对最终计数：exact 0、near 76、distinct 1088、uncertain 636。最初99个near全部已复读，23项更正详情见上表。主sheet后1900行仍为空白，留给独立审阅者/根任务合并。本节为AI辅助逐对判断与同审阅者复读，不能充当人类独立金标准。
+
+## scale6000 训练第三段3030:3600独立盲审
+
+仅逐对完整阅读blind_train.csv的0-based3030:3600共570对两段正文，并使用冻结指南；保存labels_train_tertiary.csv（570行），未查看候选分数、商品用户星级、验证或测试标签。首轮exact 1、near 20、distinct 260、uncertain 289。复读全部20个near、1个exact及289个uncertain，新增uncertain在near复读时已全文复读；8项标签更正如下。另修正3037与3464的理由表达，标签保持uncertain。
+
+|原盲表1-based行|pair_id|原标签|新标签|更正理由|
+|---|---|---|---|---|
+|3039|bfbe006695bf4acfe24a252d118a8a2597758df7f859e37aedc880e5b8098ac8|near|uncertain|只称平板键盘能用，未明转换接口或具体机型，不推定相同转接关系|
+|3101|6bb97fadefa023abc7d37fb1c7170ce7e25954ff0cfafa99049cdf5867603f98|near|uncertain|B只称fitbit2，无法从正文确认是Charge2而非其他第二代型号|
+|3172|9ab56af53a3acd3cd40ebdbae64cd52b051ca3b1416059b894eeefc630aaaad7|near|distinct|同C线转microUSB用途，但B增加连电脑数据连接而A仅描述旧设备继续用|
+|3209|93639cd572f2682749b652e39d0156b4eafb9b69eca9118bea8c2f85a08ae9e4|near|distinct|指纹失败相同，但A另明确触控能力降低并拆膜，B未有该触控问题|
+|3422|dd833af1a7baa44a0d092a5e6525cc82e759b09d6eb5e2f4aba8d809a67d8e5c|near|uncertain|B只称fitbit2，不能推定为A明确的Charge2|
+|3429|6e64ac86b7821ea0f69832fbeae90a96b0ee304a789165709a8ec4399b6a89f4|near|distinct|均CD槽磁吸稳，但A硅胶指固定，B可调屏角及与拇指螺钉架比较新增|
+|3452|a79d0f3e4766ad23b37062c7ccc482fd06741ef99b70eeb4a54472b190d7c88f|near|distinct|A厚膜S21注册与增敏失败的具体条件，B仅未指定设备的指纹不能用|
+|3066|2106c8782585dd311aebfed7078d6b12fce3cbe2d870f0e8cf50996b84c3e17e|uncertain|distinct|A首次自拍杆与蓝牙遥控，B相机及手机兼容新增实际功能信息|
+
+最终570/570完成：exact 1、near 13、distinct 265、uncertain 291。长正文3563的LGG3摄影、DVR录像和弹簧担忧等逐段相同，判exact；通用短评不因此强判。标签来源是AI辅助审阅，复读仍由同审阅者完成，不是人类独立金标准。未进行Git操作、上传、模型训练或测试评价。
+
+## scale6000 最后200对分担进度（未复审）
+
+根任务确认另一审阅者未读或标注0-based2800:3000后，独立写labels_train_final200.csv。当前已完整阅读并标注2800:2880共80对，两侧正文全部实际读完且逐对给理由；2880:3000余120对未读、保持空白。本次按根任务额度指令在当前批次保存后停止，80对尚未进行第二轮near/uncertain复审，不能标记此200任务已完成。首轮当前near 1、distinct 34、uncertain 45、exact 0（已与sheet实际计数核对）。标签来源为AI辅助，不是人类金标准。原2370对完成且复审结果保留，未更改其他sheet。
