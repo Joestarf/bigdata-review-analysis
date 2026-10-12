@@ -31,7 +31,7 @@ class Predictor:
             return "review","annotation_gate_not_met_or_model_not_locked; exact_signal="+str(normalize_text(a)==normalize_text(b) if exact is None else exact).lower()
         config=self.lock["methods"][m]
         if self.lock.get("population_automatic_ready") is not True:
-            return "review","enriched_AI_benchmark_only; independent_population_review_required"
+            return "review","enriched_benchmark_only; independent_population_review_required"
         if not config["qualified"]:
             return "review","validation_precision_target_not_met"
         return ("duplicate" if score>=config["threshold"] else "distinct"),"locked_validation_threshold"
@@ -132,7 +132,7 @@ def handoff(root=ROOT,count=10):
                "file_sha256":{p:sha_file(out/p) for p in ["reviews.csv","pair_scores.csv"]},
                "model_lock_sha256":sha_file(root/"models/model_lock.json") if predictor.lock else None,
                "score_meanings":predictor.lock["score_meanings"] if predictor.lock else {"C":"untrained","E":"untrained"},
-               "note":"AI benchmark scores; review decisions require independent review before downstream weighting."})
+               "note":"Benchmark scores; review decisions require independent review before downstream weighting."})
     return {"products":len(products),"reviews":len(reviews),"pairs":len(results)//5,"path":str(out)}
 
 def validate_inference(root=ROOT):

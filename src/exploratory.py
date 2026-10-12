@@ -58,7 +58,7 @@ def explore_labels(root=ROOT):
         ax.bar(labels.index,values,bottom=bottom,label=label,color=color)
         for i,v in enumerate(values): ax.text(i,bottom[i]+v/2,str(int(v)),ha="center",va="center",color="white")
         bottom+=values
-    ax.set(ylabel="Review pairs",title="AI-assisted labels after blind review")
+    ax.set(ylabel="Review pairs",title="Reference labels after blind review")
     ax.legend(loc="upper right")
     (root/"results/figures").mkdir(parents=True,exist_ok=True)
     fig.savefig(root/"results/figures/annotation_label_distribution.png",dpi=160);plt.close(fig)

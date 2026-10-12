@@ -38,7 +38,7 @@ def read_labels(root, split, require_complete=True):
         raise GateError(f"Unknown labels: {invalid}")
     if require_complete and (labels.label.eq("").any() or labels.reason.str.strip().eq("").any()):
         done = int((labels.label.ne("") & labels.reason.str.strip().ne("")).sum())
-        raise GateError(f"{split}: {done}/{len(labels)} AI-assisted judgments complete. Finish local annotation first.")
+        raise GateError(f"{split}: {done}/{len(labels)} pair judgments complete. Finish local annotation first.")
     if labels.reason.str.len().gt(1000).any():raise GateError("Annotation reason exceeds 1000 characters.")
     labeled = expected.merge(labels, on="pair_id", validate="one_to_one")
     if labeled.label.eq("exact").any():

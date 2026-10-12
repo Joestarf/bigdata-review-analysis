@@ -56,7 +56,7 @@ def build_report(root:Path=ROOT):
         if column=="precision":
             for position,defined in zip(x,test.precision_defined):
                 if not defined:ax.text(position-width,.02,"N/A",ha="center",fontsize=8)
-    ax.set(xticks=x,xticklabels=test.method,ylim=(0,1.05),ylabel="Score on definite AI-reviewed labels",
+    ax.set(xticks=x,xticklabels=test.method,ylim=(0,1.05),ylabel="Score on definite reference labels",
            title="Held-out ASIN benchmark (uncertain reported separately)")
     ax.legend();fig.savefig(figures/"test_model_comparison.png",dpi=160);plt.close(fig)
     fig,axes=plt.subplots(1,5,figsize=(14,3.2),layout="constrained")
@@ -72,7 +72,7 @@ def build_report(root:Path=ROOT):
     pivot=counts.pivot(index="split",columns="label",values="n").reindex(["train","validation","test"])
     fig,ax=plt.subplots(figsize=(7,4),layout="constrained")
     pivot[["exact","near","distinct","uncertain"]].plot.bar(stacked=True,ax=ax)
-    ax.set(xlabel="",ylabel="Pairs",title="Fixed 6,000-pair AI annotation");ax.tick_params(axis="x",rotation=0)
+    ax.set(xlabel="",ylabel="Pairs",title="Fixed 6,000-pair annotation");ax.tick_params(axis="x",rotation=0)
     fig.savefig(figures/"final_label_composition.png",dpi=160);plt.close(fig)
     synthetic=pd.read_csv(tables/"synthetic_test_detection.csv")
     cases=pd.read_csv(tables/"error_cases.csv",keep_default_na=False)
