@@ -97,7 +97,7 @@ def build_report(root:Path=ROOT):
 
 已完成固定数据审计、6,000对真实评论的自动辅助标注、2,000个合成训练正例与100个变换审阅、A—E五方法训练/对照、参数锁定后一次最终测试，以及全部同ASIN对推断。{scope}
 
-标签未经独立人类金标准复核；候选按相似度、随机和短文配额富集。评价只说明这一固定参考标签集上的表现，不能估计自然重复率或判断水军。全量输出全部review，不直接赋予降权权重，不生成传递重复组。
+标签未经独立人类金标准复核；候选按相似度、随机和短文配额富集。评价只说明这一固定参考标签集上的表现，不能估计自然重复率或判断水军。识别输出全部review，不直接赋予降权权重，不生成传递重复组。单独的分级折扣与样本评分影响实验见rating_adjustment.md，可移植模型和数据包见deliverables/README.md。
 
 ## 数据与版本
 
@@ -187,7 +187,7 @@ error_cases.csv提供{len(cases)}个错误/不确定案例及正文、参考理�
     inventory=[]
     for directory in ["data","models","results","report","notebooks"]:
         for path in sorted((root/directory).rglob("*")):
-            if path.is_file() and path.suffix in [".csv",".json",".joblib",".npy",".gz",".md",".png",".ipynb"] and path.name!="artifact_inventory.csv":
+            if path.is_file() and path.suffix in [".csv",".json",".joblib",".npy",".gz",".md",".png",".ipynb",".zip",".sha256"] and path.name!="artifact_inventory.csv":
                 inventory.append({"path":str(path.resolve()),"relative_path":str(path.relative_to(root)),
                                   "bytes":path.stat().st_size,"sha256":sha_file(path)})
     write_csv(tables/"artifact_inventory.csv",pd.DataFrame(inventory))

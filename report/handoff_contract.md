@@ -83,3 +83,12 @@ pair_id | asin | review_id_a | review_id_b | method | score | decision | reason
 ## 6. 实现对照
 
 实际调用为 predict_pairs([(text_a,text_b), ...]) 和 score_product(DataFrame[asin,review_id,text])，每对5行；正文接口使用虚拟文本编号，商品接口使用真实review_id。当前状态与输入失败处理以 runbook.md 和 implementation_status.md 为准。模型锁定前的预览C/E分数为空；锁定后的完整交接提供五方法分数。由于只有富集AI基准证据，完整交接也保持decision=review，不作为自动降权证据。
+
+
+## 7. 分级折扣实验与交接包
+
+识别接口的decision=review继续保留。独立的src.rating_adjustment按已声明政策模拟评分变化，不修改模型锁或封存测试，不把候选改标为已确认重复。
+
+公开team_handoff.zip提供可移植识别模型、全部review_weights及六策略product_ratings。默认product_final_ratings用于当前样本的下游对照。折扣规则、证据层级、加权均值和样本名次见rating_adjustment.md；模型从src.portable加载，不需要原始数据或完整向量缓存。
+
+完整版team_research_private.zip含原五字段数据、固定标签和缓存，保存在本地results/handoff/。评论编号是可回连键，公开包去除正文字段、原用户ID和时间戳，但不宣称不可逆匿名化。发布清单与校验方式见deliverables/README.md。

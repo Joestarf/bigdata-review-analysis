@@ -7,3 +7,5 @@
 - Before committing or pushing, run .venv/bin/python scripts/check_git_scope.py and inspect the staged file list.
 - Real-pair labels are automatically assisted judgments, never a human gold standard. Never invent missing labels or use test labels before the model lock.
 - Preserve the original sample and original annotation batches. Do not adjust models using the final test.
+
+- The curated deliverables/team_handoff.zip contains the portable model and derived rating tables. Check it with python -m src.package_handoff --verify deliverables/team_handoff.zip before publishing. Keep original review-body columns, original user IDs, timestamps, annotation files, full pair output and vector caches out of this public archive; the full research archive stays under ignored results/handoff/.

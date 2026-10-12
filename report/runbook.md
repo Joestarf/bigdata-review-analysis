@@ -70,3 +70,10 @@ product_scores = p.score_product(g[["asin", "review_id", "text"]])
 全量结果gzip使用固定mtime=0；manifest记录4,146,325评论对、五方法行数、输出SHA、模型锁SHA、最终评价SHA和实测耗时/内存。validate对总量、校验值和待复核决策范围核对。
 
 report命令必须在最终评价、全量推断及性能基准完成后运行，生成汇总报告、三张对照图和本地逐文件SHA清单；不重新拟合或重跑测试。
+
+
+## 折扣与交接包
+
+完整本地实验可运行python -m src.rating_adjustment，再运行python -m src.package_handoff。它们使用已锁定分数和政策，不重新训练或使用测试调参。
+
+公开包在新目录解压后，按requirements-inference.txt安装运行依赖；使用src.portable调用模型。评分重算仅需python -m src.rating_adjustment --weights data/review_weights.csv --output product_ratings.csv。完整原数据/固定标签/向量缓存包只保存在results/handoff/team_research_private.zip，公开包的衍生评分数据与模型由打包程序明确校验发布范围。
