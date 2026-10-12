@@ -132,7 +132,7 @@ def activate_scale(root:Path=ROOT):
     freeze=read_json(out/"guideline_freeze.json")
     freeze["previous_pair_table_sha256"]=freeze["pair_table_sha256"]
     freeze["pair_table_sha256"]=meta["pair_table_sha256"]
-    freeze["scale_authorization"]="User explicitly requested larger labels; target6000 fixed before fitting; guide unchanged."
+    freeze["scale_policy"]="Target6000 fixed before fitting; label definitions unchanged."
     write_json(out/"guideline_freeze.json",freeze)
     sm["activated_pair_sha256"]=meta["pair_table_sha256"];write_json(scale/"manifest.json",sm)
     # Existing test receipt no longer matches new tasks until independent manager merges.

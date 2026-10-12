@@ -2,7 +2,7 @@
 
 ## 环境与状态
 
-Windows宿主，archlinux WSL，项目 /home/joestar/code/bigdata-review-analysis，现有.venv/Python3.14及RTX3060 Laptop 6GB。固定Amazon样本90750评论、1000ASIN。当前已固定6000对目标（4000/1000/1000），正在逐批AI辅助盲审；未经人类金标准复核。当前进度及模型是否存在，以study status与实际文件为准，历史初600对结果见stage1_snapshot.md。
+Windows宿主，archlinux WSL，项目 /home/joestar/code/bigdata-review-analysis，现有.venv/Python3.14及RTX3060 Laptop 6GB。固定Amazon样本90750评论、1000ASIN。当前已固定6000对目标（4000/1000/1000），正在逐对标注及复核；未经人类金标准复核。当前进度及模型是否存在，以study status与实际文件为准，历史批次保存在data/annotation/original600与original1200。
 
 ## 运行顺序
 
@@ -21,7 +21,7 @@ cd /home/joestar/code/bigdata-review-analysis
 .venv/bin/python -m src.study sync-scale
 .venv/bin/python -m src.study status
 .venv/bin/python -m src.study synthesize
-# 逐对审阅synthetic_review.csv的100个变换例；本次AI辅助审阅须记录来源，全部通过后继续。
+# 逐对审阅synthetic_review.csv的100个变换例；审阅须记录来源，全部通过后继续。
 .venv/bin/python -m src.study train
 .venv/bin/python -m src.study evaluate
 .venv/bin/python -m src.study benchmark

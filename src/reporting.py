@@ -95,7 +95,7 @@ def build_report(root:Path=ROOT):
 
 ## 结论及范围
 
-已完成固定数据审计、6,000对真实评论的AI辅助标注、2,000个合成训练正例与100个变换审阅、A—E五方法训练/对照、参数锁定后一次最终测试，以及全部同ASIN对推断。{scope}
+已完成固定数据审计、6,000对真实评论的自动辅助标注、2,000个合成训练正例与100个变换审阅、A—E五方法训练/对照、参数锁定后一次最终测试，以及全部同ASIN对推断。{scope}
 
 标签未经独立人类金标准复核；候选按相似度、随机和短文配额富集。评价只说明这一固定AI标注集上的表现，不能估计自然重复率或判断水军。全量输出全部review，不直接赋予降权权重，不生成传递重复组。
 
@@ -158,11 +158,11 @@ error_cases.csv提供{len(cases)}个错误/不确定案例及正文、参考理�
 
 固定10商品交接位于results/handoff/，正文及review_id可回连；predict_pairs与score_product具体调用见runbook.md及handoff_contract.md。原五字段接口保持不变。每对五行包含pair_id、asin、两个review_id、method、score、decision、reason。余弦和未校准分类器分数不能称真实重复概率。
 
-## 验收、独立审核与Git
+## 工程验收与文件管理
 
-独立GPT-6.1 Sol三轮提出九项实质问题，已经修正并记录third_party_review.md。工程测试及实际全量验收见implementation_status.md与acceptance_report.json；夹具成绩不当真实模型成绩。
+工程问题与修正见third_party_review.md；实际验收见acceptance_report.json。夹具成绩不当作真实模型成绩。生成报告时的代码版本：{git_tip}。
 
-Git历史误上传已获用户明确同意后清理，旧历史备份在仓库外，本地数据完整保留。当前只提交代码、说明、安全图和无输出notebook模板；data/、模型、CSV/JSON结果、带输出notebook保持本地。报告生成时Git代码提交：{git_tip}。
+原始数据、标签、模型、CSV/JSON结果和带输出notebook保留本地；仓库提供代码、研究说明、图及无输出notebook模板。
 
 ## 文件与后续建议
 
