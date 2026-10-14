@@ -1,5 +1,7 @@
 # Duplicate Review Detection and Ranking Impact Analysis
 
+**组员接手入口：[组内交接说明](report/team_handoff_guide.md)**。包含下载、数据字段、模型调用、评分口径、结果限制及原始材料获取方式。
+
 ## Course
 Big Data Introduction
 

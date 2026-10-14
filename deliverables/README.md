@@ -1,5 +1,7 @@
 # 组内交接下载
 
+请先读[组内交接说明](../report/team_handoff_guide.md)，按分工选择评分数据包或多语言模型包。
+
 - [team_handoff.zip](team_handoff.zip)：5.46MiB。含可移植模型、90,750条评论编号/原星级/六策略权重、1,000商品最终星级及候选分数；不含原评论正文字段、原用户标识或时间戳。评论编号可回连固定样本，不能视为不可逆匿名化。
 - [校验值](team_handoff.sha256)：ZIP的SHA-256；包内manifest核对逐文件SHA。
 - 完整研究包保存在WSL本地results/handoff/team_research_private.zip（160.03MiB），含原五字段数据、固定标签及向量缓存，可供组内另行交接；未上传公开仓库。
