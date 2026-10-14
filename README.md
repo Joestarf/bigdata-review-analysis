@@ -89,3 +89,17 @@ cd /home/joestar/code/bigdata-review-analysis
 ## 中文输入诊断
 
 固定模型已使用28条公开中文样例的112个同源变换、46个构造控制对及其46个英文对照进行诊断。中文词面覆盖及按空格计词存在适配问题，否定与数字辨别在英文中也有误信号。目前不宜把既有模型/阈值直接用于中文近似重复或自动评分降权；原交接包及英语结果没有修改。测试规模与实际分组结果见[中文诊断报告](report/chinese_probe.md)。
+
+
+## 多语言版本与程度复核
+
+独立多语言版本已训练：新增中文辅助样本11,663条/254商品，600对同商品任务；与原6,000对英语候选合计6,600对。冻结多语言编码器，重新拟合中文字符词面表示与C/E逻辑回归，原英语模型和评分交接包保留。
+
+程度接口输出暂定是否重复、none/light/medium/high、证据强度及复核标记。正常相似好评不判重复；部分具体事实重合为轻度；主要具体事实相同为高度。原不确定2,667对已完成三层证据处理，1,922对仍低证据；不是把所有不确定项强行判明。
+
+[完整改造结果与限制](report/multilingual_adaptation.md) · [程度口径](report/multilingual_degree_policy.md) · [多语言推断包](deliverables/multilingual_model.zip)。没有方法通过自动选型条件；后验标签复核结果与首次封存结果分别保存。程度规则是独立的暂定层，不直接生成评分折扣。
+
+~~~bash
+python -m src.multilingual_inference --input pairs.csv --output scores.csv
+python -m src.redundancy_degree --input pairs.csv --output degrees.csv
+~~~

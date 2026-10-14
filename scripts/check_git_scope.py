@@ -20,6 +20,13 @@ if "deliverables/team_handoff.zip" in files(["ls-files"]):
         verify_public(root/"deliverables/team_handoff.zip")
     except Exception as e:
         errors.append(f"Public handoff bundle failed content verification: {e}")
+if "deliverables/multilingual_model.zip" in files(["ls-files"]):
+    sys.path.insert(0,str(root))
+    try:
+        from src.multilingual_package import verify
+        verify(root/"deliverables/multilingual_model.zip")
+    except Exception as e:
+        errors.append(f"Multilingual bundle failed content verification: {e}")
 if errors:
     print("\n".join(errors),file=sys.stderr);sys.exit(1)
 print("Git scope check passed: ignored data stays local; tracked notebooks have no outputs.")
