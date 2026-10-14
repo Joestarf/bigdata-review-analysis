@@ -10,3 +10,8 @@
 模型接口见[portable_model](../report/portable_model.md)，策略及实测结果见[rating_adjustment](../report/rating_adjustment.md)。在新目录解压，按包内README执行；不依赖原工作目录。
 
 发布范围由src/package_handoff.py校验：模型、代码、研究说明及不含正文/用户/时间的衍生评分数据。原data/、models/和其他CSV/JSON仍保持忽略，不强制加入原始文件。
+
+
+## 中文输入诊断
+
+固定模型已使用28条公开中文样例的112个同源变换、46个构造控制对及其46个英文对照进行诊断。中文词面覆盖及按空格计词存在适配问题，否定与数字辨别在英文中也有误信号。目前不宜把既有模型/阈值直接用于中文近似重复或自动评分降权；原交接包及英语结果没有修改。测试规模与实际分组结果见[中文诊断报告](../report/chinese_probe.md)。
